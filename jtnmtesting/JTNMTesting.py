@@ -11,9 +11,23 @@ app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    r = make_response(render_template("index.html", cachebuster=CACHEBUSTER))
-    r.headers['Cache-Control'] = 'no-cache, no-store'
-    return r
+    if request.method == 'GET':
+        if data.getStatus() == 'Test':
+            question, answers = data.getQandA()
+            name, description = data.getTestDetails()
+            r = make_response(render_template("index.html", question=question, answers=answers, 
+                                              name=name, description=description, cachebuster=CACHEBUSTER))
+        else:
+            r = make_response(render_template("index.html", question=None, answers=None, 
+                                              name=None, description=None, cachebuster=CACHEBUSTER))
+        r.headers['Cache-Control'] = 'no-cache, no-store'
+        return r
+
+    else:
+        form = request.form.to_dict()
+        data.setAnswer(form['answer'])
+
+        return Response(json.dumps(data.getJson()), mimetype='application/json')
 
 @app.route('/x-nmos/client-testing/', methods=['GET', 'POST'], strict_slashes=False)
 def jtnm_tests():

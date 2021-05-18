@@ -46,6 +46,11 @@ def index():
             print("Tests completed")
             return 'Tests completed'
 
+@TEST_API.route('/jtnm_response', methods=['POST'], strict_slashes=False)
+def retrieve_answer():
+
+    return 'OK'
+
 
 class JTNMTest(GenericTest):
     """
@@ -198,12 +203,12 @@ class JTNMTest(GenericTest):
         # Run tests
         self.execute_tests(test_name)
 
-        while not TESTS_CANCELLED and not TESTS_COMPLETE:
-            print('waiting')
-            time.sleep(20)
+        # while not TESTS_CANCELLED and not TESTS_COMPLETE:
+        #     print('waiting')
+        #     time.sleep(20)
 
         # TODO move return_results to somewhere else, triggered by user completing tests
-        self.return_results()
+        self.tear_down_tests()
         return self.result
 
     def return_results(self):
@@ -214,8 +219,6 @@ class JTNMTest(GenericTest):
         test = Test("Test teardown", "tear_down_tests")
         self.tear_down_tests()
         self.result.append(test.NA(""))
-
-        return self.result
 
     def execute_tests(self, test_names):
         """
@@ -239,10 +242,33 @@ class JTNMTest(GenericTest):
                 }
                 # Send questions to jtnm testing API endpoint then wait
                 valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json=json_out)
-                time.sleep(20)
-                # Do something to retrieve user response
+                
+                self.answer_received = False
+                user_response = ''
+                count = 0
+
+                while not self.answer_received:
+                    count += 1
+                    time.sleep(20)
+                    user_response = self.check_for_update()
+                    if count > 10:
+                        break
+
                 # Validate response and add to results
-                # self.result.append(method(False, t, response.json['answer_response']))
+                self.result.append(method(False, t, user_response))
+
+        # POST with empty name to trigger reset of data store after last test
+        valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json={'name': ''})
+
+    def check_for_update(self):
+        """
+        GET request to jtnm test suite to check for answer in JSON
+        """
+        valid, response = self.do_request("GET", self.apis[JTNM_API_KEY]["url"])
+
+        if response.json()['answer_response'] != '':
+            self.answer_received = True
+            return response.json()['answer_response']
 
     def _registry_mdns_info(self, port, priority=0, api_ver=None, api_proto=None, api_auth=None, ip=None):
         """Get an mDNS ServiceInfo object in order to create an advertisement"""

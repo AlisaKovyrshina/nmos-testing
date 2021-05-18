@@ -6,6 +6,24 @@
     <link rel="stylesheet" href="static/css/bootstrap.min.css">
     <link rel="stylesheet" href="static/css/style.css?nocache-{{ cachebuster }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+    <script>
+        $(function () {
+            $('#submitAnswer').submit(function(e) {
+                var form = $(this);
+                $.ajax({
+                    type: form.attr('method'),
+                    url: form.attr('action'),
+                    data: form.serialize(),
+                });
+                e.preventDefault();
+                $('#submitbtn').val('Submitting...');
+                $('#submitbtn').attr("disabled", true);
+                setTimeout("window.location.reload()", 15000);
+            });
+        });
+    </script>
 
 </head>
 <body>
@@ -20,9 +38,30 @@
             This test suite is under active development and does not yet provide 100% coverage of specifications.<br />
             We recommend regularly re-testing implementations as new tests are developed.
         </div>
-        <div class="text">
-            Run the JT_NM Test suite on your NMOS testing instance and click start below to begin the interactive Controller test process
-        </div><br/>
+        {% if question == None %}
+            <div class="text">
+                No tests found. Run the JT_NM Test suite on your NMOS testing instance and refresh this page
+            </div><br/>
+        {% else %}
+            <div class="text">
+                {{ name }} - {{ description }}
+            </div>
+
+            <div class="question">
+                {{ question }}
+            </div>
+            <div class="answers">
+                <form id="submitAnswer" method="POST" action='/'>
+                    {% for answer in answers %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="answer" id="answer__{{ loop.index0 }}" value="{{ answer }}">
+                            <label class="form-check-label" for="flexRadioDefault1">{{ answer }}</label>
+                        </div>
+                    {% endfor %}
+                    <input type="submit" id="submitbtn" value="Submit"/>
+                </form>
+            </div>
+        {% endif%}
     </div>
     <br/>
     <br>
