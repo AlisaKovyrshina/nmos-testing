@@ -40,7 +40,7 @@ class DataStore:
             self.question = json_str['question']
             self.answers = json_str['answers']
             self.time_sent = json_str['time_sent']
-            self.url_for_response = json_str['url_for_response']
+            self.url_for_response = 'http://' + json_str['url_for_response'] + '/jtnm_response'
             self.answer_response = json_str['answer_response']
             self.time_answered = json_str['time_answered']
 

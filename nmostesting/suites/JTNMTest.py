@@ -3,10 +3,12 @@ import json
 import socket
 import requests
 import inspect
+import threading
 from time import sleep
 from urllib.parse import parse_qs
 from dnslib import QTYPE
 from OpenSSL import crypto
+from requests.sessions import Request
 from zeroconf_monkey import ServiceBrowser, ServiceInfo, Zeroconf
 
 from ..GenericTest import GenericTest, NMOSTestException, NMOSInitException
@@ -21,34 +23,17 @@ from flask import Flask, render_template, make_response, abort, Blueprint, flash
 import random
 
 JTNM_API_KEY = "client-testing"
-
 CACHEBUSTER = random.randint(1, 10000)
+
+answer_available = threading.Event()
+
 app = Flask(__name__)
 TEST_API = Blueprint('test_api', __name__)
-TESTS_COMPLETE = False
-TESTS_CANCELLED = False
 
-@TEST_API.route('/testing', methods=['POST'])
-def index():
-    """
-    Testing cancel/complete buttons to end test suite execution
-    """
-    global TESTS_COMPLETE, TESTS_CANCELLED
-
-    form = request.form.to_dict()
-    if 'button_type' in form:
-        if form['button_type'] == 'Cancel':
-            TESTS_CANCELLED = True
-            print('Tests cancelled')
-            return 'Tests cancelled'
-        elif form['button_type'] == 'Finish':
-            TESTS_COMPLETE = True
-            print("Tests completed")
-            return 'Tests completed'
 
 @TEST_API.route('/jtnm_response', methods=['POST'], strict_slashes=False)
 def retrieve_answer():
-
+    answer_available.set()
     return 'OK'
 
 
@@ -145,9 +130,6 @@ class JTNMTest(GenericTest):
         # if CONFIG.DNS_SD_MODE == "multicast":
         #     for info in registry_mdns:
         #         self.zc.unregister_service(info)
-        global TESTS_COMPLETE, TESTS_CANCELLED
-        TESTS_CANCELLED = False
-        TESTS_COMPLETE = False
 
         for index, registry in enumerate(self.registries):
             registry.disable()
@@ -173,7 +155,6 @@ class JTNMTest(GenericTest):
         Overriding GenericTest run_tests to stop after set up since this test suite is user-driven
         """
         # Set up
-        global TESTS_COMPLETE, TESTS_CANCELLED
         print('Running')
         test = Test("Test setup", "set_up_tests")
         CONFIG.AUTH_TOKEN = None
@@ -203,23 +184,13 @@ class JTNMTest(GenericTest):
         # Run tests
         self.execute_tests(test_name)
 
-        # while not TESTS_CANCELLED and not TESTS_COMPLETE:
-        #     print('waiting')
-        #     time.sleep(20)
-
-        # TODO move return_results to somewhere else, triggered by user completing tests
-        self.tear_down_tests()
-        return self.result
-
-    def return_results(self):
-        """
-        Tear down section from GenericTest run_tests to be called once the user has completed the tests
-        """
-        # Tear down
+        # Tear down tests
         test = Test("Test teardown", "tear_down_tests")
         self.tear_down_tests()
         self.result.append(test.NA(""))
 
+        return self.result
+        
     def execute_tests(self, test_names):
         """
         Overriding GenericTest execute tests to not auto run all of the tests.
@@ -243,32 +214,30 @@ class JTNMTest(GenericTest):
                 # Send questions to jtnm testing API endpoint then wait
                 valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json=json_out)
                 
-                self.answer_received = False
-                user_response = ''
-                count = 0
+                thread = threading.Thread()
+                thread.start()
 
-                while not self.answer_received:
-                    count += 1
-                    time.sleep(20)
-                    user_response = self.check_for_update()
-                    if count > 10:
-                        break
-
-                # Validate response and add to results
-                self.result.append(method(False, t, user_response))
+                # Wait for answer available signal or 120s then move on
+                get_json = answer_available.wait(timeout=120)
+                
+                if get_json:
+                    json = self.get_jtnm_json()
+                    # Validate response and add to results
+                    self.result.append(method(False, t, json['answer_response']))
+                else:
+                    self.result.append(t.UNCLEAR("Test timed out"))
+                
+                answer_available.clear()
 
         # POST with empty name to trigger reset of data store after last test
-        valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json={'name': ''})
+        self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json={'name': ''})
 
-    def check_for_update(self):
+    def get_jtnm_json(self):
         """
         GET request to jtnm test suite to check for answer in JSON
         """
         valid, response = self.do_request("GET", self.apis[JTNM_API_KEY]["url"])
-
-        if response.json()['answer_response'] != '':
-            self.answer_received = True
-            return response.json()['answer_response']
+        return response.json()
 
     def _registry_mdns_info(self, port, priority=0, api_ver=None, api_proto=None, api_auth=None, ip=None):
         """Get an mDNS ServiceInfo object in order to create an advertisement"""

@@ -26,6 +26,9 @@ def index():
     else:
         form = request.form.to_dict()
         data.setAnswer(form['answer'])
+        
+        url = data.getURL()
+        valid, response = do_request('POST', url, json={})
 
         return Response(json.dumps(data.getJson()), mimetype='application/json')
 
