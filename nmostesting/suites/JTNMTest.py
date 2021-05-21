@@ -145,48 +145,6 @@ class JTNMTest(GenericTest):
             self.dns_server.reset()
 
         self.registry_location = ''
-    
-    def run_tests(self, test_name=["all"]):
-        """
-        Perform tests and return the results as a list
-        Overriding GenericTest run_tests to stop after set up since this test suite is user-driven
-        """
-        # Set up
-        print('Running')
-        test = Test("Test setup", "set_up_tests")
-        CONFIG.AUTH_TOKEN = None
-        if self.authorization:
-            # We write to config here as this needs to be available outside this class
-            scopes = []
-            for api in self.apis:
-                scopes.append(api)
-            # Add 'query' permission when mock registry is disabled and existing network registry is used
-            if not CONFIG.ENABLE_DNS_SD and "query" not in scopes:
-                scopes.append("query")
-            CONFIG.AUTH_TOKEN = self.generate_token(scopes, True)
-        if CONFIG.PREVALIDATE_API:
-            for api in self.apis:
-                if "raml" not in self.apis[api] or self.apis[api]["url"] is None:
-                    continue
-                valid, response = self.do_request("GET", self.apis[api]["url"])
-                if not valid:
-                    raise NMOSInitException("No API found at {}".format(self.apis[api]["url"]))
-                elif response.status_code != 200:
-                    raise NMOSInitException("No API found or unexpected error at {} ({})".format(self.apis[api]["url"],
-                                                                                                 response.status_code))
-
-        self.set_up_tests()
-        self.result.append(test.NA(""))
-
-        # Run tests
-        self.execute_tests(test_name)
-
-        # Tear down tests
-        test = Test("Test teardown", "tear_down_tests")
-        self.tear_down_tests()
-        self.result.append(test.NA(""))
-
-        return self.result
         
     def execute_tests(self, test_names):
         """
