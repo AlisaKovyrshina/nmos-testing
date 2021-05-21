@@ -40,9 +40,7 @@ def retrieve_answer():
 class JTNMTest(GenericTest):
     """
     Testing initial set up of new test suite for controller testing
-    """
-    test_list = {}
-    
+    """    
     def __init__(self, apis, registries, dns_server):
         # JRT: overwrite the spec_path parameter to prevent GenericTest from attempting to download RAML from repo
         apis["client-testing"]["spec_path"] = None
@@ -147,7 +145,6 @@ class JTNMTest(GenericTest):
             self.dns_server.reset()
 
         self.registry_location = ''
-        JTNMTest.test_list = {}
     
     def run_tests(self, test_name=["all"]):
         """
@@ -202,14 +199,14 @@ class JTNMTest(GenericTest):
                 t = Test(inspect.getdoc(method), test)
                 question, answers = method()
                 json_out = {
-                    'name': test,
-                    'description': inspect.getdoc(method),
-                    'question': question,
-                    'answers': answers,
-                    'time_sent': time.time(),
-                    'url_for_response': request.headers.get('Host'),
-                    'answer_response': '',
-                    'time_answered': ''
+                    "name": test,
+                    "description": inspect.getdoc(method),
+                    "question": question,
+                    "answers": answers,
+                    "time_sent": time.time(),
+                    "url_for_response": "http://" + request.headers.get("Host") + "/jtnm_response",
+                    "answer_response": "",
+                    "time_answered": ""
                 }
                 # Send questions to jtnm testing API endpoint then wait
                 valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json=json_out)
@@ -218,10 +215,10 @@ class JTNMTest(GenericTest):
                 thread.start()
 
                 # Wait for answer available signal or 120s then move on
-                get_json = answer_available.wait(timeout=120)
-                
-                if get_json:
-                    json = self.get_jtnm_json()
+                answer = answer_available.wait(timeout=30)
+                json = self.get_jtnm_json()
+
+                if json['answer_response'] != '':
                     # Validate response and add to results
                     self.result.append(method(False, t, json['answer_response']))
                 else:
@@ -229,8 +226,8 @@ class JTNMTest(GenericTest):
                 
                 answer_available.clear()
 
-        # POST with empty name to trigger reset of data store after last test
-        self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json={'name': ''})
+        # POST with clear to trigger reset of data store after last test
+        self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json={"clear": "True"})
 
     def get_jtnm_json(self):
         """

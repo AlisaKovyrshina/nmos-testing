@@ -20,7 +20,7 @@
                 e.preventDefault();
                 $('#submitbtn').val('Submitting...');
                 $('#submitbtn').attr("disabled", true);
-                setTimeout("window.location.reload()", 5000);
+                setTimeout("window.location.reload()", 3000);
             });
         });
     </script>
@@ -45,7 +45,7 @@
         {% else %}
             <div class="text">
                 {{ name }} - {{ description }}
-            </div>
+            </div><br/>
 
             <div class="question">
                 {{ question }}
@@ -58,6 +58,9 @@
                             <label class="form-check-label" for="flexRadioDefault1">{{ answer }}</label>
                         </div>
                     {% endfor %}
+                    <input type="hidden" id="all_data" name="all_data" value="{{ all_data }}">
+                    <input type="hidden" id="response_url" name="response_url" value="{{ response_url }}">
+                    <br/>
                     <input type="submit" id="submitbtn" value="Submit"/>
                 </form>
             </div>
