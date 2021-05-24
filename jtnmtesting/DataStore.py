@@ -12,6 +12,7 @@ class DataStore:
         self.question = None
         self.answers = None
         self.time_sent = None
+        self.timeout = None
         self.url_for_response = None
         self.answer_response = None
         self.time_answered = None
@@ -23,6 +24,7 @@ class DataStore:
         self.question = None
         self.answers = None
         self.time_sent = None
+        self.timeout = None
         self.url_for_response = None
         self.answer_response = None
         self.time_answered = None
@@ -38,6 +40,7 @@ class DataStore:
             self.question = json_str["question"]
             self.answers = json_str["answers"]
             self.time_sent = json_str["time_sent"]
+            self.timeout = json_str['timeout']
             self.url_for_response = json_str["url_for_response"]
             self.answer_response = json_str["answer_response"]
             self.time_answered = json_str["time_answered"]
@@ -49,6 +52,7 @@ class DataStore:
             "question": self.question,
             "answers": self.answers,
             "time_sent": self.time_sent,
+            "timeout": self.timeout,
             "url_for_response": self.url_for_response,
             "answer_response": self.answer_response,
             "time_answered": self.time_answered
@@ -73,6 +77,9 @@ class DataStore:
 
     def getTime(self):
         return self.time_sent
+    
+    def getTimeout(self):
+        return self.timeout
 
     def getUrl(self):
         return self.url_for_response

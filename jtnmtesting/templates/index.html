@@ -25,6 +25,34 @@
         });
     </script>
 
+    <script>
+        // Target for countdown is time question was sent plus timeout converted to milliseconds
+        var target=(parseInt("{{ time_sent }}") + parseInt("{{ timeout }}")) * 1000;
+        console.log("{{ time_sent }}", '{{ timeout }}')
+        var x = setInterval(function() {
+            // current time
+            var now = new Date().getTime();
+
+            var difference = target - now;
+            console.log(target, now, difference)
+            var minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            var seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+            // update the countdown
+            if (seconds < 10) {
+                document.getElementById("countdown").innerHTML = minutes + ':0' + seconds;
+            } else {
+                document.getElementById("countdown").innerHTML = minutes + ':' + seconds;
+            }
+            
+            // If expired show message
+            if (difference < 0) {
+                clearInterval(x);
+                document.getElementById("countdown").innerHTML = "Test expired"
+            }
+        }, 1000);
+    </script>
+
 </head>
 <body>
     <div id="page">
@@ -47,9 +75,12 @@
                 {{ name }} - {{ description }}
             </div><br/>
 
+            <div id="countdown"></div><br/>
+
             <div class="question">
                 {{ question }}
             </div>
+
             <div class="answers">
                 <form id="submitAnswer" method="POST" action='/'>
                     {% for answer in answers %}

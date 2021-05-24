@@ -62,6 +62,7 @@ class JTNMTest(GenericTest):
         self.zc_listener = None
         self.is04_utils = IS04Utils(self.jtnm_url)
         self.registry_location = ''
+        self.question_timeout = 30 # seconds
 
     def set_up_tests(self):
         print('Setting up tests')
@@ -162,6 +163,7 @@ class JTNMTest(GenericTest):
                     "question": question,
                     "answers": answers,
                     "time_sent": time.time(),
+                    "timeout": self.question_timeout,
                     "url_for_response": "http://" + request.headers.get("Host") + "/jtnm_response",
                     "answer_response": "",
                     "time_answered": ""
@@ -173,7 +175,7 @@ class JTNMTest(GenericTest):
                 thread.start()
 
                 # Wait for answer available signal or 120s then move on
-                answer = answer_available.wait(timeout=30)
+                answer = answer_available.wait(timeout=self.question_timeout)
                 json = self.get_jtnm_json()
 
                 if json['answer_response'] != '':

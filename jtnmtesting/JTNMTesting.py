@@ -16,6 +16,7 @@ def index():
             r = make_response(render_template("index.html", question=data.getQuestion(), 
                                               answers=data.getAnswers(), name=data.getName(), 
                                               description=data.getDescription(), response_url=data.getUrl(),
+                                              time_sent=data.getTime(), timeout=data.getTimeout(),
                                               all_data=data.getJson(), cachebuster=CACHEBUSTER))
         else:
             r = make_response(render_template("index.html", question=None, answers=None, 
