@@ -20,7 +20,7 @@
                 e.preventDefault();
                 $('#submitbtn').val('Submitting...');
                 $('#submitbtn').attr("disabled", true);
-                setTimeout("window.location.reload()", 3000);
+                setTimeout("window.location.reload()", 2000);
             });
         });
     </script>
@@ -28,13 +28,14 @@
     <script>
         // Target for countdown is time question was sent plus timeout converted to milliseconds
         var target=(parseInt("{{ time_sent }}") + parseInt("{{ timeout }}")) * 1000;
-        console.log("{{ time_sent }}", '{{ timeout }}')
-        var x = setInterval(function() {
+
+        if (isNaN(target) == false) {
+            var x = setInterval(function() {
             // current time
             var now = new Date().getTime();
 
             var difference = target - now;
-            console.log(target, now, difference)
+
             var minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
             var seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
@@ -48,15 +49,24 @@
             // If expired show message
             if (difference < 0) {
                 clearInterval(x);
-                document.getElementById("countdown").innerHTML = "Test expired"
+                document.getElementById("countdown").innerHTML = "Test expired. Please Refresh"
+                var submitBtn = document.getElementById("submitbtn");
+                submitBtn.disabled = true;
             }
         }, 1000);
+        } 
+
     </script>
 
 </head>
 <body>
     <div id="page">
         <h1>NMOS Controller Test</h1>
+
+        <div class="refresh_button">
+            <a href="{{ url_for('index') }}"><button type="button" class="btn btn-outline-primary">Refresh</button></a>
+        </div>
+
         <noscript>
           <div class="alert alert-danger top_alert" role="alert">
               This test suite requires JavaScript. Please enable it to ensure accurate results.
@@ -71,30 +81,32 @@
                 No tests found. Run the JT_NM Test suite on your NMOS testing instance and refresh this page
             </div><br/>
         {% else %}
-            <div class="text">
+            <div class="text test_details">
                 {{ name }} - {{ description }}
             </div><br/>
 
             <div id="countdown"></div><br/>
 
-            <div class="question">
-                {{ question }}
-            </div>
+            <form id="submitAnswer" method="POST" action='/'>
+                <div class="col-md-6 mx-auto">
+                    <div class="card">
+                        <div class="card-header">{{ question }}</div>
+                        <ul class="list-group list-group-flush">
+                            {% for answer in answers %}
+                                <li class="list-group-item">
+                                    <input class="form-check-input" type="radio" name="answer" id="answer_{{ loop.index0 }}" value="{{ answer }}">
+                                    <label class="form-check-label" for="answer_{{ loop.index0 }}">{{ answer }}</label>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                <input type="hidden" id="all_data" name="all_data" value="{{ all_data }}">
+                <input type="hidden" id="response_url" name="response_url" value="{{ response_url }}">
+                <br/>
+                <input type="submit" id="submitbtn" value="Submit"/>
+            </form>
 
-            <div class="answers">
-                <form id="submitAnswer" method="POST" action='/'>
-                    {% for answer in answers %}
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="answer" id="answer__{{ loop.index0 }}" value="{{ answer }}">
-                            <label class="form-check-label" for="flexRadioDefault1">{{ answer }}</label>
-                        </div>
-                    {% endfor %}
-                    <input type="hidden" id="all_data" name="all_data" value="{{ all_data }}">
-                    <input type="hidden" id="response_url" name="response_url" value="{{ response_url }}">
-                    <br/>
-                    <input type="submit" id="submitbtn" value="Submit"/>
-                </form>
-            </div>
         {% endif%}
     </div>
     <br/>

@@ -102,3 +102,13 @@ h1, h2, h3, h4, h5 {
     font-size: 12px;
     margin: 25px;
 }
+
+.refresh_button {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
+
+.test_details {
+    font-size: large;
+}
