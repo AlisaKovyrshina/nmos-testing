@@ -163,6 +163,7 @@ class JTNMTest(GenericTest):
             "question": question,
             "answers": answers,
             "time_sent": time.time(),
+            "timeout": self.question_timeout,
             "url_for_response": "http://" + request.headers.get("Host") + "/jtnm_response",
             "answer_response": "",
             "time_answered": ""
@@ -172,7 +173,7 @@ class JTNMTest(GenericTest):
 
         # Wait for answer available signal or 120s then move on
         answer_available.clear()
-        get_json = answer_available.wait(timeout=120)
+        get_json = answer_available.wait(timeout=self.question_timeout)
         
         if get_json == False:
             return "Test timed out"    
@@ -264,6 +265,8 @@ class JTNMTest(GenericTest):
 
         if actual_answer == possible_answers[2]:
             return test.PASS('I didn\'t vote for him')
+        elif actual_answer == 'Test timed out':
+            return test.UNCLEAR('Test timed out')
         else:
             return test.FAIL('Knight of the round table')
 
@@ -278,6 +281,8 @@ class JTNMTest(GenericTest):
 
         if actual_answer == possible_answers[1]:
             return test.PASS('The Grail awaits')
+        elif actual_answer == 'Test timed out':
+            return test.UNCLEAR('Test timed out')
         else:
             return test.FAIL('Ni')
 
@@ -292,5 +297,7 @@ class JTNMTest(GenericTest):
 
         if actual_answer == possible_answers[1]:
             return test.PASS('Off you go then')
+        elif actual_answer == 'Test timed out':
+            return test.UNCLEAR('Test timed out')
         else:
             return test.FAIL('Ahhhhhhhhh')
