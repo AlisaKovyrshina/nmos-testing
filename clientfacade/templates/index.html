@@ -29,7 +29,11 @@
         // Target for countdown is time question was sent plus timeout converted to milliseconds
         var target=(parseInt("{{ time_sent }}") + parseInt("{{ timeout }}")) * 1000;
 
-        if (isNaN(target) == false) {
+        if (isNaN(target)) {
+        // No question data, should check periodically and refresh once found
+            setInterval(checkForQuestion, 5000);
+
+        } else {
             var x = setInterval(function() {
             // current time
             var now = new Date().getTime();
@@ -54,6 +58,16 @@
         }, 1000);
         } 
 
+        function checkForQuestion() {
+            $.ajax({
+                url: "{{ url_for('jtnm_tests') }}",
+                success: function(data) {
+                    if (data['name']) {
+                        window.location.reload();
+                    }
+                }
+            });
+        } 
     </script>
 
 </head>
