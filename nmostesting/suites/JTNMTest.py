@@ -19,7 +19,7 @@ from ..MdnsListener import MdnsListener
 from ..TestHelper import get_default_ip, load_resolved_schema
 from ..TestResult import Test
 
-from flask import Flask, render_template, make_response, abort, Blueprint, flash, request, Response
+from flask import Flask, render_template, make_response, abort, Blueprint, flash, request, Response, session
 import random
 
 JTNM_API_KEY = "client-testing"
@@ -27,15 +27,21 @@ CACHEBUSTER = random.randint(1, 10000)
 
 answer_available = threading.Event()
 
+
 app = Flask(__name__)
 TEST_API = Blueprint('test_api', __name__)
 
 
-@TEST_API.route('/jtnm_response', methods=['POST'], strict_slashes=False)
+@TEST_API.route('/clientfacade_response', methods=['POST'])
 def retrieve_answer():
-    answer_available.set()
-    return 'OK'
+    # Hmmmm, there must be a more elegant way to pass data between threads in a Flask application
+    global clientfacade_answer_json
 
+    if request.method == 'POST':
+        clientfacade_answer_json = request.json
+        answer_available.set()
+
+    return 'OK'
 
 class JTNMTest(GenericTest):
     """
@@ -155,6 +161,8 @@ class JTNMTest(GenericTest):
     
     def invoke_client_facade(self, test, question, answers):
 
+        global clientfacade_answer_json
+
         method = getattr(self, test)
 
         json_out = {
@@ -164,7 +172,7 @@ class JTNMTest(GenericTest):
             "answers": answers,
             "time_sent": time.time(),
             "timeout": self.question_timeout,
-            "url_for_response": "http://" + request.headers.get("Host") + "/jtnm_response",
+            "url_for_response": "http://" + request.headers.get("Host") + "/clientfacade_response",
             "answer_response": "",
             "time_answered": ""
         }
@@ -177,10 +185,16 @@ class JTNMTest(GenericTest):
         
         if get_json == False:
             return "Test timed out"    
-            
-        json = self.get_jtnm_json()
 
-        return json['answer_response']
+        # JSON reponse to question is set in in clientfacade_answer_json global variable (Hmmm)
+        # Basic integrity check for response json
+        if clientfacade_answer_json['name'] is None:
+            return "Integrity check failed: result format error: " +jsnon.dump(clientfacade_answer_json)
+
+        if clientfacade_answer_json['name'] != json_out['name']:
+            return "Integrity check failed: cannot compare result of " + json_out['name'] + " with expected result for " + clientfacade_answer_json['name']
+            
+        return clientfacade_answer_json['answer_response']
 
     def get_jtnm_json(self):
         """
