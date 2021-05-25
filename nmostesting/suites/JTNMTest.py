@@ -39,6 +39,8 @@ def retrieve_answer():
 
     if request.method == 'POST':
         clientfacade_answer_json = request.json
+        if 'name' not in clientfacade_answer_json:
+            return 'OK'
         answer_available.set()
 
     return 'OK'
@@ -189,7 +191,7 @@ class JTNMTest(GenericTest):
         # JSON reponse to question is set in in clientfacade_answer_json global variable (Hmmm)
         # Basic integrity check for response json
         if clientfacade_answer_json['name'] is None:
-            return "Integrity check failed: result format error: " +jsnon.dump(clientfacade_answer_json)
+            return "Integrity check failed: result format error: " +json.dump(clientfacade_answer_json)
 
         if clientfacade_answer_json['name'] != json_out['name']:
             return "Integrity check failed: cannot compare result of " + json_out['name'] + " with expected result for " + clientfacade_answer_json['name']
