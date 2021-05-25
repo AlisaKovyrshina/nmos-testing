@@ -40,7 +40,9 @@ def retrieve_answer():
 class JTNMTest(GenericTest):
     """
     Testing initial set up of new test suite for controller testing
-    """    
+    """
+    test_list = {}
+    
     def __init__(self, apis, registries, dns_server):
         # JRT: overwrite the spec_path parameter to prevent GenericTest from attempting to download RAML from repo
         apis["client-testing"]["spec_path"] = None
@@ -130,6 +132,9 @@ class JTNMTest(GenericTest):
         #     for info in registry_mdns:
         #         self.zc.unregister_service(info)
 
+        # Reset the state of the client testing façade
+        self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json={"clear": "True"})
+
         for index, registry in enumerate(self.registries):
             registry.disable()
 
@@ -146,48 +151,35 @@ class JTNMTest(GenericTest):
             self.dns_server.reset()
 
         self.registry_location = ''
+        JTNMTest.test_list = {}
+    
+    def invoke_client_facade(self, test, question, answers):
+
+        method = getattr(self, test)
+
+        json_out = {
+            "name": test,
+            "description": inspect.getdoc(method),
+            "question": question,
+            "answers": answers,
+            "time_sent": time.time(),
+            "url_for_response": "http://" + request.headers.get("Host") + "/jtnm_response",
+            "answer_response": "",
+            "time_answered": ""
+        }
+        # Send questions to jtnm testing API endpoint then wait
+        valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json=json_out)
+
+        # Wait for answer available signal or 120s then move on
+        answer_available.clear()
+        get_json = answer_available.wait(timeout=120)
         
-    def execute_tests(self, test_names):
-        """
-        Overriding GenericTest execute tests to not auto run all of the tests.
-        Produces dict of test names and descriptions
-        """
-        for test in test_names:
-            method = getattr(self, test)
-            if callable(method):
-                t = Test(inspect.getdoc(method), test)
-                question, answers = method()
-                json_out = {
-                    "name": test,
-                    "description": inspect.getdoc(method),
-                    "question": question,
-                    "answers": answers,
-                    "time_sent": time.time(),
-                    "timeout": self.question_timeout,
-                    "url_for_response": "http://" + request.headers.get("Host") + "/jtnm_response",
-                    "answer_response": "",
-                    "time_answered": ""
-                }
-                # Send questions to jtnm testing API endpoint then wait
-                valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json=json_out)
-                
-                thread = threading.Thread()
-                thread.start()
+        if get_json == False:
+            return "Test timed out"    
+            
+        json = self.get_jtnm_json()
 
-                # Wait for answer available signal or 120s then move on
-                answer = answer_available.wait(timeout=self.question_timeout)
-                json = self.get_jtnm_json()
-
-                if json['answer_response'] != '':
-                    # Validate response and add to results
-                    self.result.append(method(False, t, json['answer_response']))
-                else:
-                    self.result.append(t.UNCLEAR("Test timed out"))
-                
-                answer_available.clear()
-
-        # POST with clear to trigger reset of data store after last test
-        self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json={"clear": "True"})
+        return json['answer_response']
 
     def get_jtnm_json(self):
         """
@@ -261,44 +253,44 @@ class JTNMTest(GenericTest):
             for info in registry_mdns[3:]:
                 self.zc.register_service(info)
 
-    def test_01(self, setup=True, test=None, answer=None):
+    def test_01(self, test):
         """
         Example test 1
         """
-        test_question = 'What is your name?'
-        test_answers = ['Sir Robin of Camelot', 'Sir Galahad of Camelot', 'Arthur, King of the Britons']
-        if setup:
-            return test_question, test_answers
-        else:
-            if answer == 'Arthur, King of the Britons':
-                return test.PASS('I didn\'t vote for him')
-            else:
-                return test.FAIL('Knight of the round table')
+        question = 'What is your name?'
+        possible_answers = ['Sir Robin of Camelot', 'Sir Galahad of Camelot', 'Arthur, King of the Britons']
 
-    def test_02(self, setup=True, test=None, answer=None):
+        actual_answer = self.invoke_client_facade("test_01", question, possible_answers)
+
+        if actual_answer == possible_answers[2]:
+            return test.PASS('I didn\'t vote for him')
+        else:
+            return test.FAIL('Knight of the round table')
+
+    def test_02(self, test):
         """
         Example test 2
         """
-        test_question = 'What is your Quest?'
-        test_answers = ['To find a shrubbery', 'To seek the Holy Grail']
-        if setup:
-            return test_question, test_answers
-        else:
-            if answer == 'To seek the Holy Grail':
-                return test.PASS('The Grail awaits')
-            else:
-                return test.FAIL('Ni')
+        question = 'What is your Quest?'
+        possible_answers = ['To find a shrubbery', 'To seek the Holy Grail']
 
-    def test_03(self, setup=True, test=None, answer=None):
+        actual_answer = self.invoke_client_facade("test_02", question, possible_answers)
+
+        if actual_answer == possible_answers[1]:
+            return test.PASS('The Grail awaits')
+        else:
+            return test.FAIL('Ni')
+
+    def test_03(self, test):
         """
         Example test 3
         """
-        test_question = 'What is your favourite colour?'
-        test_answers = ['Blue', 'Yellow']
-        if setup:
-            return test_question, test_answers
+        question = 'What is your favourite colour?'
+        possible_answers = ['Blue', 'Yellow']
+
+        actual_answer = self.invoke_client_facade("test_02", question, possible_answers)
+
+        if actual_answer == possible_answers[1]:
+            return test.PASS('Off you go then')
         else:
-            if answer == 'Yellow':
-                return test.PASS('Off you go then')
-            else:
-                return test.FAIL('Ahhhhhhhhh')
+            return test.FAIL('Ahhhhhhhhh')
