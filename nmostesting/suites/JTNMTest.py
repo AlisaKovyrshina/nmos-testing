@@ -161,11 +161,13 @@ class JTNMTest(GenericTest):
         self.registry_location = ''
         JTNMTest.test_list = {}
     
-    def invoke_client_facade(self, test, question, answers):
+    def invoke_client_facade(self, test, question, answers, timeout=None):
 
         global clientfacade_answer_json
 
         method = getattr(self, test)
+
+        question_timeout = timeout if timeout else self.question_timeout
 
         json_out = {
             "name": test,
@@ -173,7 +175,7 @@ class JTNMTest(GenericTest):
             "question": question,
             "answers": answers,
             "time_sent": time.time(),
-            "timeout": self.question_timeout,
+            "timeout": question_timeout,
             "url_for_response": "http://" + request.headers.get("Host") + "/clientfacade_response",
             "answer_response": "",
             "time_answered": ""
@@ -183,7 +185,7 @@ class JTNMTest(GenericTest):
 
         # Wait for answer available signal or 120s then move on
         answer_available.clear()
-        get_json = answer_available.wait(timeout=self.question_timeout)
+        get_json = answer_available.wait(timeout=question_timeout)
         
         if get_json == False:
             return "Test timed out"    
@@ -317,3 +319,32 @@ class JTNMTest(GenericTest):
             return test.UNCLEAR('Test timed out')
         else:
             return test.FAIL('Ahhhhhhhhh')
+
+    def test_04(self, test):
+        """
+        Connect controller to mock registry and verify nodes and devices
+        """
+        question = "Connect your controller to the Query API at http://" + get_default_ip() + \
+                   ":" + str(self.primary_registry.get_data().port) + "/x-nmos/query/v1.3 How many nodes are connected?"
+        possible_answers = ['0', '1', '2', '3']
+
+        actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=120)
+
+        if actual_answer == possible_answers[0]:
+            pass
+        elif actual_answer == 'Test timed out':
+            return test.UNCLEAR('Test timed out')
+        else:
+            return test.FAIL('Incorrect number of nodes found')
+
+        question = "How many devices are connected?"
+        possible_answers = ['0', '1', '2']
+    
+        actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=90)
+
+        if actual_answer == possible_answers[0]:
+            return test.PASS('Nodes and Devices in mock registry correctly identified')
+        elif actual_answer == 'Test timed out':
+            return test.UNCLEAR('Test timed out')
+        else:
+            return test.FAIL('Incorrect number of devices found')
