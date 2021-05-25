@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="static/css/style.css?nocache-{{ cachebuster }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-
+    
     <script>
         $(function () {
             $('#submitAnswer').submit(function(e) {
@@ -23,9 +23,7 @@
                 setTimeout("window.location.reload()", 2000);
             });
         });
-    </script>
 
-    <script>
         // Target for countdown is time question was sent plus timeout converted to milliseconds
         var target=(parseInt("{{ time_sent }}") + parseInt("{{ timeout }}")) * 1000;
 
@@ -69,8 +67,8 @@
             });
         } 
     </script>
-
 </head>
+
 <body>
     <div id="page">
         <h1>NMOS Controller Test</h1>
