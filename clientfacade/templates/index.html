@@ -49,9 +49,7 @@
             // If expired show message
             if (difference < 0) {
                 clearInterval(x);
-                document.getElementById("countdown").innerHTML = "Test expired. Please Refresh"
-                var submitBtn = document.getElementById("submitbtn");
-                submitBtn.disabled = true;
+                window.location.reload();
             }
         }, 1000);
         } 
