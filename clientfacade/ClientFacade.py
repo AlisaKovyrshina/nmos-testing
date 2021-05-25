@@ -32,9 +32,9 @@ def index():
             json_data['answer_response'] = form['answer']
 
             # POST to x-nmos/client-testing/ with new data
-            valid, response = do_request('POST', "http://" + request.headers.get("Host") + url_for('.jtnm_tests'), json=json_data)
+            #valid, response = do_request('POST', "http://" + request.headers.get("Host") + url_for('.jtnm_tests'), json=json_data)
             # POST to test suite to confirm answer available
-            valid, response = do_request('POST', form['response_url'], json={})
+            valid, response = do_request('POST', form['response_url'], json=json_data)
 
         else:
             return False, "No answer submitted"
@@ -103,3 +103,6 @@ def do_request(method, url, **kwargs):
         return False, str(e)
     except requests.exceptions.RequestException as e:
         return False, str(e)
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5001)
