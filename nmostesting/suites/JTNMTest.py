@@ -293,7 +293,7 @@ class JTNMTest(GenericTest):
         question = 'What is your favourite colour?'
         possible_answers = ['Blue', 'Yellow']
 
-        actual_answer = self.invoke_client_facade("test_02", question, possible_answers)
+        actual_answer = self.invoke_client_facade("test_03", question, possible_answers)
 
         if actual_answer == possible_answers[1]:
             return test.PASS('Off you go then')
