@@ -23,6 +23,7 @@ from flask import Flask, render_template, make_response, abort, Blueprint, flash
 import random
 
 JTNM_API_KEY = "client-testing"
+CALLBACK_ENDPOINT = "/clientfacade_response"
 CACHEBUSTER = random.randint(1, 10000)
 
 answer_available = threading.Event()
@@ -31,8 +32,12 @@ answer_available = threading.Event()
 app = Flask(__name__)
 TEST_API = Blueprint('test_api', __name__)
 
+class ClientFacadeException(Exception):
+    """Provides a way to exit a single test, by providing the TestResult return statement as the first exception
+       parameter"""
+    pass
 
-@TEST_API.route('/clientfacade_response', methods=['POST'])
+@TEST_API.route(CALLBACK_ENDPOINT, methods=['POST'])
 def retrieve_answer():
     # Hmmmm, there must be a more elegant way to pass data between threads in a Flask application
     global clientfacade_answer_json
@@ -176,7 +181,7 @@ class JTNMTest(GenericTest):
             "answers": answers,
             "time_sent": time.time(),
             "timeout": question_timeout,
-            "url_for_response": "http://" + request.headers.get("Host") + "/clientfacade_response",
+            "url_for_response": "http://" + request.headers.get("Host") + CALLBACK_ENDPOINT,
             "answer_response": "",
             "time_answered": ""
         }
@@ -188,15 +193,15 @@ class JTNMTest(GenericTest):
         get_json = answer_available.wait(timeout=question_timeout)
         
         if get_json == False:
-            return "Test timed out"    
+            raise ClientFacadeException("Test timed out")
 
         # JSON reponse to question is set in in clientfacade_answer_json global variable (Hmmm)
         # Basic integrity check for response json
         if clientfacade_answer_json['name'] is None:
-            return "Integrity check failed: result format error: " +json.dump(clientfacade_answer_json)
+            raise ClientFacadeException("Integrity check failed: result format error: " +json.dump(clientfacade_answer_json))
 
         if clientfacade_answer_json['name'] != json_out['name']:
-            return "Integrity check failed: cannot compare result of " + json_out['name'] + " with expected result for " + clientfacade_answer_json['name']
+            raise ClientFacadeException("Integrity check failed: cannot compare result of " + json_out['name'] + " with expected result for " + clientfacade_answer_json['name'])
             
         return clientfacade_answer_json['answer_response']
 
@@ -276,75 +281,78 @@ class JTNMTest(GenericTest):
         """
         Example test 1
         """
-        question = 'What is your name?'
-        possible_answers = ['Sir Robin of Camelot', 'Sir Galahad of Camelot', 'Arthur, King of the Britons']
+        try:
+            question = 'What is your name?'
+            possible_answers = ['Sir Robin of Camelot', 'Sir Galahad of Camelot', 'Arthur, King of the Britons']
 
-        actual_answer = self.invoke_client_facade("test_01", question, possible_answers)
+            actual_answer = self.invoke_client_facade("test_01", question, possible_answers, timeout=10)
 
-        if actual_answer == possible_answers[2]:
-            return test.PASS('I didn\'t vote for him')
-        elif actual_answer == 'Test timed out':
-            return test.UNCLEAR('Test timed out')
-        else:
-            return test.FAIL('Knight of the round table')
+            if actual_answer == possible_answers[2]:
+                return test.PASS('I didn\'t vote for him')
+            else:
+                return test.FAIL('Knight of the round table')
+        except ClientFacadeException as e:
+                return test.UNCLEAR(e.args[0])
 
     def test_02(self, test):
         """
         Example test 2
         """
-        question = 'What is your Quest?'
-        possible_answers = ['To find a shrubbery', 'To seek the Holy Grail']
+        try:
+            question = 'What is your Quest?'
+            possible_answers = ['To find a shrubbery', 'To seek the Holy Grail']
 
-        actual_answer = self.invoke_client_facade("test_02", question, possible_answers)
+            actual_answer = self.invoke_client_facade("test_02", question, possible_answers)
 
-        if actual_answer == possible_answers[1]:
-            return test.PASS('The Grail awaits')
-        elif actual_answer == 'Test timed out':
-            return test.UNCLEAR('Test timed out')
-        else:
-            return test.FAIL('Ni')
+            if actual_answer == possible_answers[1]:
+                return test.PASS('The Grail awaits')
+            else:
+                return test.FAIL('Ni')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
 
     def test_03(self, test):
         """
         Example test 3
         """
-        question = 'What is your favourite colour?'
-        possible_answers = ['Blue', 'Yellow']
+        try:
+            question = 'What is your favourite colour?'
+            possible_answers = ['Blue', 'Yellow']
 
-        actual_answer = self.invoke_client_facade("test_03", question, possible_answers)
+            actual_answer = self.invoke_client_facade("test_03", question, possible_answers)
 
-        if actual_answer == possible_answers[1]:
-            return test.PASS('Off you go then')
-        elif actual_answer == 'Test timed out':
-            return test.UNCLEAR('Test timed out')
-        else:
-            return test.FAIL('Ahhhhhhhhh')
+            if actual_answer == possible_answers[1]:
+                return test.PASS('Off you go then')
+            else:
+                return test.FAIL('Ahhhhhhhhh')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
+
 
     def test_04(self, test):
         """
         Connect controller to mock registry and verify nodes and devices
         """
-        question = "Connect your controller to the Query API at http://" + get_default_ip() + \
-                   ":" + str(self.primary_registry.get_data().port) + "/x-nmos/query/v1.3 How many nodes are connected?"
-        possible_answers = ['0', '1', '2', '3']
+        try:
+            question = "Connect your controller to the Query API at http://" + get_default_ip() + \
+                       ":" + str(self.primary_registry.get_data().port) + "/x-nmos/query/v1.3 How many nodes are connected?"
+            possible_answers = ['0', '1', '2', '3']
 
-        actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=120)
+            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=120)
 
-        if actual_answer == possible_answers[0]:
-            pass
-        elif actual_answer == 'Test timed out':
-            return test.UNCLEAR('Test timed out')
-        else:
-            return test.FAIL('Incorrect number of nodes found')
+            if actual_answer == possible_answers[0]:
+                pass
+            else:
+                return test.FAIL('Incorrect number of nodes found')
 
-        question = "How many devices are connected?"
-        possible_answers = ['0', '1', '2']
+            question = "How many devices are connected?"
+            possible_answers = ['0', '1', '2']
     
-        actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=90)
+            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=90)
 
-        if actual_answer == possible_answers[0]:
-            return test.PASS('Nodes and Devices in mock registry correctly identified')
-        elif actual_answer == 'Test timed out':
-            return test.UNCLEAR('Test timed out')
-        else:
-            return test.FAIL('Incorrect number of devices found')
+            if actual_answer == possible_answers[0]:
+                return test.PASS('Nodes and Devices in mock registry correctly identified')
+            else:
+                return test.FAIL('Incorrect number of devices found')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
