@@ -1,11 +1,12 @@
 import time
 import json
 import socket
+import uuid
 import requests
 import inspect
 import threading
 from time import sleep
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 from dnslib import QTYPE
 from OpenSSL import crypto
 from requests.sessions import Request
@@ -23,6 +24,7 @@ from flask import Flask, render_template, make_response, abort, Blueprint, flash
 import random
 
 JTNM_API_KEY = "client-testing"
+REG_API_KEY = "registration"
 CACHEBUSTER = random.randint(1, 10000)
 
 answer_available = threading.Event()
@@ -73,6 +75,7 @@ class JTNMTest(GenericTest):
         self.is04_utils = IS04Utils(self.jtnm_url)
         self.registry_location = ''
         self.question_timeout = 30 # seconds
+        self.test_data = self.load_resource_data()
 
     def set_up_tests(self):
         print('Setting up tests')
@@ -116,7 +119,7 @@ class JTNMTest(GenericTest):
             registry.reset()
 
         self.primary_registry.enable()
-        self.registry_location = get_default_ip() + ':' + str(self.primary_registry.get_data().port)
+        self.registry_location = 'http://' + get_default_ip() + ':' + str(self.primary_registry.get_data().port) + '/'
 
         if CONFIG.DNS_SD_MODE == "multicast":
             self.zc.register_service(registry_mdns[0])
@@ -131,7 +134,7 @@ class JTNMTest(GenericTest):
             for info in registry_mdns[3:]:
                 self.zc.register_service(info)
 
-        print('Registry should be available at http://' + get_default_ip() + ':' + str(self.primary_registry.get_data().port))
+        print('Registry should be available at ' + self.registry_location)
 
     def tear_down_tests(self):
         print('Tearing down tests')
@@ -272,6 +275,104 @@ class JTNMTest(GenericTest):
             for info in registry_mdns[3:]:
                 self.zc.register_service(info)
 
+    def load_resource_data(self):
+        """Loads test data from files"""
+        api = self.apis[JTNM_API_KEY]
+        result_data = dict()
+        resources = ["node", "device", "source", "flow", "sender", "receiver"]
+        for resource in resources:
+            with open("test_data/IS0402/v1.3_{}.json".format(resource)) as resource_data:
+                resource_json = json.load(resource_data)
+                result_data[resource] = resource_json
+
+        return result_data
+
+    def post_resource(self, test, type, data=None, reg_url=None, codes=None, fail=Test.FAIL, headers=None):
+        """
+        Perform a POST request on the Registration API to create or update a resource registration.
+        Raises an NMOSTestException when the response is not as expected.
+        Otherwise, on success, returns values of the Location header and X-Paging-Timestamp debugging header.
+        """
+        if not data:
+            data = self.test_data[type]
+
+        if not reg_url:
+            reg_url = self.registry_location + 'x-nmos/registration/v1.3/'
+
+        if not codes:
+            codes = [200, 201]
+
+        valid, r = self.do_request("POST", reg_url + "resource", json={"type": type, "data": data}, headers=headers)
+        if not valid:
+            raise NMOSTestException(fail(test, "Registration API returned an unexpected response: {}".format(r)))
+
+        location = None
+        timestamp = None
+
+        wrong_codes = [_ for _ in [200, 201] if _ not in codes]
+
+        if r.status_code in wrong_codes:
+            raise NMOSTestException(fail(test, "Registration API returned wrong HTTP code: {}".format(r.status_code)))
+        elif r.status_code not in codes:
+            raise NMOSTestException(fail(test, "Registration API returned an unexpected response: "
+                                               "{} {}".format(r.status_code, r.text)))
+        elif r.status_code in [200, 201]:
+            # X-Paging-Timestamp is a response header that implementations may include to aid debugging
+            if "X-Paging-Timestamp" in r.headers:
+                timestamp = r.headers["X-Paging-Timestamp"]
+            if "Location" not in r.headers:
+                raise NMOSTestException(fail(test, "Registration API failed to return a 'Location' response header"))
+            # TODO check why resource/{}s/{} in ISO402 version. Fails here, works there
+            path = "{}resource/{}/{}".format(urlparse(reg_url).path, type, data["id"])
+            location = r.headers["Location"]
+            if path not in location:
+                raise NMOSTestException(fail(test, "Registration API 'Location' response header is incorrect: "
+                                             "Location: {}".format(location)))
+            if not location.startswith("/") and not location.startswith(self.protocol + "://"):
+                raise NMOSTestException(fail(test, "Registration API 'Location' response header is invalid for the "
+                                             "current protocol: Location: {}".format(location)))
+
+        return location, timestamp
+
+    def post_super_resources_and_resource(self, test, type, description, fail=Test.FAIL):
+        """
+        Perform POST requests on the Registration API to create the super-resource registrations
+        for the requested type, before performing a POST request to create that resource registration
+        """
+
+        # use the test data as a template for creating new resources
+        data = self.copy_resource(type)
+        data["id"] = str(uuid.uuid4())
+        data["description"] = description
+
+        if type == "node":
+            pass
+        elif type == "device":
+            node = self.post_super_resources_and_resource(test, "node", description, fail=Test.UNCLEAR)
+            data["node_id"] = node["id"]
+            data["senders"] = []  # or add an id here, and use it when posting the sender?
+            data["receivers"] = []  # or add an id here, and use it when posting the receiver?
+        elif type == "source":
+            device = self.post_super_resources_and_resource(test, "device", description, fail=Test.UNCLEAR)
+            data["device_id"] = device["id"]
+        elif type == "flow":
+            source = self.post_super_resources_and_resource(test, "source", description, fail=Test.UNCLEAR)
+            data["device_id"] = source["device_id"]
+            data["source_id"] = source["id"]
+            # since device_id is v1.1, downgrade
+            data = self.downgrade_resource(type, data, self.apis[REG_API_KEY]["version"])
+        elif type == "sender":
+            device = self.post_super_resources_and_resource(test, "device", description, fail=Test.UNCLEAR)
+            data["device_id"] = device["id"]
+            data["flow_id"] = str(uuid.uuid4())  # or post a flow first and use its id here?
+        elif type == "receiver":
+            device = self.post_super_resources_and_resource(test, "device", description, fail=Test.UNCLEAR)
+            data["device_id"] = device["id"]
+
+        self.post_resource(test, type, data, codes=[201], fail=fail)
+
+        return data
+
     def test_01(self, test):
         """
         Example test 1
@@ -322,10 +423,10 @@ class JTNMTest(GenericTest):
 
     def test_04(self, test):
         """
-        Connect controller to mock registry and verify nodes and devices
+        Connect controller to mock registry and verify nodes
         """
-        question = "Connect your controller to the Query API at http://" + get_default_ip() + \
-                   ":" + str(self.primary_registry.get_data().port) + "/x-nmos/query/v1.3 How many nodes are connected?"
+        question = "Connect your controller to the Query API at " + self.registry_location + \
+                   "/x-nmos/query/v1.3 How many nodes are connected?"
         possible_answers = ['0', '1', '2', '3']
 
         actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=120)
@@ -337,12 +438,14 @@ class JTNMTest(GenericTest):
         else:
             return test.FAIL('Incorrect number of nodes found')
 
-        question = "How many devices are connected?"
+        self.post_resource(test, "node")
+
+        question = "How many nodes are connected now?"
         possible_answers = ['0', '1', '2']
     
         actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=90)
 
-        if actual_answer == possible_answers[0]:
+        if actual_answer == possible_answers[1]:
             return test.PASS('Nodes and Devices in mock registry correctly identified')
         elif actual_answer == 'Test timed out':
             return test.UNCLEAR('Test timed out')
