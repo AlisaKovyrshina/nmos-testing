@@ -138,6 +138,11 @@ class JTNMTest(GenericTest):
 
         print('Registry should be available at http://' + get_default_ip() + ':' + str(self.primary_registry.get_data().port))
 
+        # Add mock data to the resistry
+        self.primary_registry.add_resource("device", "device0", "{id: 'device0'}")
+        self.primary_registry.add_resource("device", "device1", "{id: 'device1'}")
+        self.primary_registry.add_resource("device", "device2", "{id: 'device2'}")
+
     def tear_down_tests(self):
         print('Tearing down tests')
         # Clean up mDNS advertisements and disable registries
