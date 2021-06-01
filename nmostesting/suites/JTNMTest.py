@@ -5,7 +5,9 @@ import uuid
 import requests
 import inspect
 import threading
+import random
 from time import sleep
+from copy import deepcopy
 from urllib.parse import parse_qs, urlparse
 from dnslib import QTYPE
 from OpenSSL import crypto
@@ -142,9 +144,9 @@ class JTNMTest(GenericTest):
         print('Registry should be available at ' + self.registry_location)
 
         # Add mock data to the resistry
-        self.primary_registry.add_resource("device", "device0", "{id: 'device0'}")
-        self.primary_registry.add_resource("device", "device1", "{id: 'device1'}")
-        self.primary_registry.add_resource("device", "device2", "{id: 'device2'}")
+        # self.primary_registry.add_resource("device", "device0", "{id: 'device0'}")
+        # self.primary_registry.add_resource("device", "device1", "{id: 'device1'}")
+        # self.primary_registry.add_resource("device", "device2", "{id: 'device2'}")
 
     def tear_down_tests(self):
         print('Tearing down tests')
@@ -351,7 +353,7 @@ class JTNMTest(GenericTest):
         """
 
         # use the test data as a template for creating new resources
-        data = self.copy_resource(type)
+        data = deepcopy(self.test_data[type])
         data["id"] = str(uuid.uuid4())
         data["description"] = description
 
@@ -461,6 +463,41 @@ class JTNMTest(GenericTest):
             if actual_answer == possible_answers[1]:
                 return test.PASS('Nodes and Devices in mock registry correctly identified')
             else:
+                return test.FAIL('Incorrect number of nodes found')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
+
+    def test_05(self, test):
+        """
+        Identify devices in registry
+        """
+        # Send randomly chosen device each test
+        labels = ['Test device 1', 'Test device 2', 'Test device 3']
+        device_data = self.post_super_resources_and_resource(test, "device", "test_05")
+        device_data['label'] = random.choice(labels)
+        self.post_resource(test, "device", device_data, codes=[200])
+
+        try:
+            question = "Connect your controller to the Query API at " + self.registry_location + \
+                       "x-nmos/query/v1.3 How many devices are available?"
+            possible_answers = ['0', '1', '2']
+
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, timeout=90)
+
+            if actual_answer == possible_answers[1]:
+                pass
+            else:
                 return test.FAIL('Incorrect number of devices found')
+
+            question = "Which of the following devices are available?"
+            # TODO turn this one into checkbox question
+            possible_answers = labels
+
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, timeout=90)
+
+            if actual_answer == device_data['label']:
+                return test.PASS('Correctly identified device in registry')
+            else:
+                return test.FAIL('Incorrect device identified')
         except ClientFacadeException as e:
             return test.UNCLEAR(e.args[0])
