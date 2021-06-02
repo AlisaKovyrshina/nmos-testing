@@ -175,6 +175,14 @@ class JTNMTest(GenericTest):
 
         self.registry_location = ''
         JTNMTest.test_list = {}
+
+    def execute_tests(self, test_names):
+        """Perform tests defined within this class"""
+
+        for test_name in test_names:
+            self.primary_registry.reset()
+            self.primary_registry.enable()
+            self.execute_test(test_name)
     
     def invoke_client_facade(self, test, question, answers, timeout=None):
 
