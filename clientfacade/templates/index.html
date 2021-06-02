@@ -42,7 +42,9 @@
             var seconds = Math.floor((difference % (1000 * 60)) / 1000);
 
             // update the countdown
-            if (seconds < 10) {
+            if (minutes < 1 && seconds < 1 ) {
+                document.getElementById("countdown").innerHTML = '';
+            } else if (seconds < 10) {
                 document.getElementById("countdown").innerHTML = minutes + ':0' + seconds;
             } else {
                 document.getElementById("countdown").innerHTML = minutes + ':' + seconds;
@@ -90,7 +92,7 @@
                 {{ name }} - {{ description }}
             </div><br/>
 
-            <div id="countdown"></div><br/>
+            <div id="countdown" class="countdown"></div><br/>
 
             <form id="submitAnswer" method="POST" action='/'>
                 <div class="col-md-6 mx-auto">
