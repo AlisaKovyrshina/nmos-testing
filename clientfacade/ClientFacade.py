@@ -2,7 +2,7 @@ import random
 import requests
 import json
 from flask import Flask, render_template, make_response, abort, request, Response, url_for
-from .DataStore import data
+from DataStore import data
 
 
 CACHEBUSTER = random.randint(1, 10000)
@@ -13,7 +13,7 @@ app = Flask(__name__)
 def index():
     if request.method == 'GET':
         if data.getStatus() == 'Test':
-            r = make_response(render_template("index.html", question=data.getQuestion(), 
+            r = make_response(render_template("index.html", test_type=data.getTest(), question=data.getQuestion(), 
                                               answers=data.getAnswers(), name=data.getName(), 
                                               description=data.getDescription(), response_url=data.getUrl(),
                                               time_sent=data.getTime(), timeout=data.getTimeout(),
@@ -29,13 +29,22 @@ def index():
 
         if 'answer' in form:
             json_data = json.loads(form['all_data'])
-            json_data['answer_response'] = form['answer']
+
+            if json_data['test_type'] == 'checkbox':
+                json_data['answer_response'] = request.form.getlist('answer')
+            else:    
+                json_data['answer_response'] = form['answer']
 
             # POST to x-nmos/client-testing/ with new data
             #valid, response = do_request('POST', "http://" + request.headers.get("Host") + url_for('.jtnm_tests'), json=json_data)
             # POST to test suite to confirm answer available
             valid, response = do_request('POST', form['response_url'], json=json_data)
-
+        elif 'Next' in form:
+            # Test question was instuctions to be confirmed
+            json_data = json.loads(form['all_data'])
+            json_data['answer_response'] = 'Next'
+            # POST to test suite to confirm answer available
+            valid, response = do_request('POST', form['response_url'], json=json_data)
         else:
             return False, "No answer submitted"
 
@@ -45,7 +54,7 @@ def index():
 def jtnm_tests():
     if request.method == 'POST':
         # Should be json from Test Suite with questions
-        json_list = ['name', 'description', 'question', 'answers', 'time_sent', 'url_for_response']
+        json_list = ['test_type', 'name', 'description', 'question', 'answers', 'time_sent', 'url_for_response']
 
         if 'clear' in request.json and request.json['clear'] == 'True':
             # End of current tests, clear data store

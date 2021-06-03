@@ -1,5 +1,5 @@
 ## Installation & Usage
 
-`export FLASK_APP=JTNMTesting.py`
-`export FLASK_RUN_PORT=8080`
-`python3 -m flask run`
+`python3 ClientFacade.py`
+
+Should be available on 127.0.0.1:5001

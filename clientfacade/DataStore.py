@@ -7,6 +7,7 @@ class DataStore:
     """
 
     def __init__(self):
+        self.test_type = None
         self.name = None
         self.description = None
         self.question = None
@@ -19,6 +20,7 @@ class DataStore:
         self.status = "Empty"
 
     def clear(self):
+        self.test_type = None
         self.name = None
         self.description = None
         self.question = None
@@ -35,6 +37,7 @@ class DataStore:
 
     def setJson(self, json_str):
             self.status = "Test"
+            self.test_type = json_str["test_type"]
             self.name = json_str["name"]
             self.description = json_str["description"]
             self.question = json_str["question"]
@@ -47,6 +50,7 @@ class DataStore:
 
     def getJson(self):
         json_data = {
+            "test_type": self.test_type,
             "name": self.name,
             "description": self.description,
             "question": self.question,
@@ -63,6 +67,9 @@ class DataStore:
         self.answer_response = answer
         self.time_answered = time.time()
 
+    def getTest(self):
+        return self.test_type
+    
     def getName(self):
         return self.name
 

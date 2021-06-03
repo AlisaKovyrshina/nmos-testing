@@ -98,20 +98,28 @@
                 <div class="col-md-6 mx-auto">
                     <div class="card">
                         <div class="card-header">{{ question }}</div>
-                        <ul class="list-group list-group-flush">
-                            {% for answer in answers %}
-                                <li class="list-group-item">
-                                    <input class="form-check-input" type="radio" name="answer" id="answer_{{ loop.index0 }}" value="{{ answer }}">
-                                    <label class="form-check-label" for="answer_{{ loop.index0 }}">{{ answer }}</label>
-                                </li>
-                            {% endfor %}
-                        </ul>
+                        {% if test_type == "action" %}
+                        {% else %}
+                            <ul class="list-group list-group-flush">
+                                {% for answer in answers %}
+                                    <li class="list-group-item">
+                                        <input class="form-check-input" type="{{ test_type }}" name="answer" id="answer_{{ loop.index0 }}" value="{{ answer }}">
+                                        <label class="form-check-label" for="answer_{{ loop.index0 }}">{{ answer }}</label>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
                     </div>
                 </div>
                 <input type="hidden" id="all_data" name="all_data" value="{{ all_data }}">
                 <input type="hidden" id="response_url" name="response_url" value="{{ response_url }}">
                 <br/>
-                <input type="submit" id="submitbtn" value="Submit"/>
+                {% if test_type == "action" %}
+                    <input type="hidden" name="Next" value="Next">
+                    <input type="submit" id="submitbtn" value="Next"/>
+                {% else %}
+                    <input type="submit" id="submitbtn" value="Submit"/>
+                {% endif %}
             </form>
 
         {% endif%}

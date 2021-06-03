@@ -184,7 +184,7 @@ class JTNMTest(GenericTest):
             self.primary_registry.enable()
             self.execute_test(test_name)
     
-    def invoke_client_facade(self, test, question, answers, timeout=None):
+    def invoke_client_facade(self, test, question, answers, test_type, timeout=None):
 
         global clientfacade_answer_json
 
@@ -193,6 +193,7 @@ class JTNMTest(GenericTest):
         question_timeout = timeout if timeout else self.question_timeout
 
         json_out = {
+            "test_type": test_type,
             "name": test,
             "description": inspect.getdoc(method),
             "question": question,
@@ -393,6 +394,20 @@ class JTNMTest(GenericTest):
 
         return data
 
+    def randomise_answers(self, no_of_answers, max_choices=1):
+        """
+        no_of_answers: Length of possible_answers list minus 1
+        max_choices: default 1 for radio answers. No. of list indices to be returned
+        max_choices > 1 will return list of random number of list indices up to the value given
+        """
+        if max_choices == 1:
+            return [random.randint(0, no_of_answers)]
+        elif max_choices > 1:
+            choices = random.randint(1, max_choices)
+            return random.sample(list(range(0, no_of_answers)), k=choices)
+        # Do I need to add conditions here for negative numbers of choices, or choices greater
+        # than number of answers or can we trust people writing tests to use it properly?
+
     def test_01(self, test):
         """
         Example test 1
@@ -401,7 +416,7 @@ class JTNMTest(GenericTest):
             question = 'What is your name?'
             possible_answers = ['Sir Robin of Camelot', 'Sir Galahad of Camelot', 'Arthur, King of the Britons']
 
-            actual_answer = self.invoke_client_facade("test_01", question, possible_answers)
+            actual_answer = self.invoke_client_facade("test_01", question, possible_answers, test_type="radio")
 
             if actual_answer == possible_answers[2]:
                 return test.PASS('I didn\'t vote for him')
@@ -418,7 +433,7 @@ class JTNMTest(GenericTest):
             question = 'What is your Quest?'
             possible_answers = ['To find a shrubbery', 'To seek the Holy Grail']
 
-            actual_answer = self.invoke_client_facade("test_02", question, possible_answers)
+            actual_answer = self.invoke_client_facade("test_02", question, possible_answers, test_type="radio")
 
             if actual_answer == possible_answers[1]:
                 return test.PASS('The Grail awaits')
@@ -435,7 +450,7 @@ class JTNMTest(GenericTest):
             question = 'What is your favourite colour?'
             possible_answers = ['Blue', 'Yellow']
 
-            actual_answer = self.invoke_client_facade("test_03", question, possible_answers)
+            actual_answer = self.invoke_client_facade("test_03", question, possible_answers, test_type="radio")
 
             if actual_answer == possible_answers[1]:
                 return test.PASS('Off you go then')
@@ -449,27 +464,31 @@ class JTNMTest(GenericTest):
         """
         Connect controller to mock registry and verify nodes
         """
+        self.post_resource(test, "node")
         try:
             question = "Connect your controller to the Query API at " + self.registry_location + \
-                       "x-nmos/query/v1.3 How many nodes are connected?"
-            possible_answers = ['0', '1', '2', '3']
+                       "x-nmos/query/v1.3"
+            possible_answers = []
 
-            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=120)
+            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, 
+                                                      test_type="action", timeout=120)
 
-            if actual_answer == possible_answers[0]:
+            if actual_answer == 'Next':
                 pass
             else:
-                return test.FAIL('Incorrect number of nodes found')
+                # Else probably isn't necessary here as there is no 'incorrect' answer. 
+                # There are no other buttons. If Next button isn't used, test will time out
 
-            self.post_resource(test, "node")
+                return test.FAIL('Registry not found')
 
-            question = "How many nodes are connected now?"
+            question = "How many test nodes are connected?"
             possible_answers = ['0', '1', '2', '3']
     
-            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, timeout=90)
+            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, 
+                                                      test_type="radio", timeout=90)
 
             if actual_answer == possible_answers[1]:
-                return test.PASS('Nodes and Devices in mock registry correctly identified')
+                return test.PASS('Nodes in mock registry correctly identified')
             else:
                 return test.FAIL('Incorrect number of nodes found')
         except ClientFacadeException as e:
@@ -479,33 +498,43 @@ class JTNMTest(GenericTest):
         """
         Identify devices in registry
         """
-        # Send randomly chosen device each test
-        labels = ['Test device 1', 'Test device 2', 'Test device 3']
-        device_data = self.post_super_resources_and_resource(test, "device", "test_05")
-        device_data['label'] = random.choice(labels)
-        self.post_resource(test, "device", device_data, codes=[200])
+        # Potential devices to be added to registry
+        labels = ['Test device 1', 'Test device 2', 'Test device A', 'Test device B']
+        # Pick up to 2 labels
+        answer_index = self.randomise_answers(len(labels)-1, 2)
+        answer_list = [labels[i] for i in answer_index]
+
+        # Post new resources to registry
+        for i in answer_index:
+            device_data = self.post_super_resources_and_resource(test, "device", "test_05")
+            device_data['label'] = labels[i]
+            self.post_resource(test, "device", device_data, codes=[200])
 
         try:
             question = "Connect your controller to the Query API at " + self.registry_location + \
                        "x-nmos/query/v1.3 How many devices are available?"
-            possible_answers = ['0', '1', '2']
+            possible_answers = ['0', '1', '2', '3', '4']
 
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, timeout=90)
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
+                                                      test_type="radio", timeout=90)
 
-            if actual_answer == possible_answers[1]:
+            if actual_answer == str(len(answer_list)):
                 pass
             else:
-                return test.FAIL('Incorrect number of devices found')
+                return test.FAIL('Incorrect number of devices found', actual_answer)
 
             question = "Which of the following devices are available?"
-            # TODO turn this one into checkbox question
             possible_answers = labels
 
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, timeout=90)
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
+                                                      test_type="checkbox", timeout=90)
 
-            if actual_answer == device_data['label']:
-                return test.PASS('Correctly identified device in registry')
-            else:
-                return test.FAIL('Incorrect device identified')
+            # Checkbox answers come as lists
+            for answer in actual_answer:
+                if answer in answer_list:
+                    pass
+                else:
+                    return test.FAIL('Incorrect device identified')
+            return test.PASS('Devices correctly identified')
         except ClientFacadeException as e:
             return test.UNCLEAR(e.args[0])
