@@ -221,7 +221,7 @@ def post_resource(version):
         registry.add(request.headers, request.json, version)
     except BCP00302Exception:
         abort(403)
-    location = "/x-nmos/registration/{}/resource/{}/{}".format(version, request.json["type"],
+    location = "/x-nmos/registration/{}/resource/{}s/{}".format(version, request.json["type"],
                                                                request.json["data"]["id"])
     if registered:
         return jsonify(request.json["data"]), 200, {"Location": location}

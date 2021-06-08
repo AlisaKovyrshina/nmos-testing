@@ -241,8 +241,7 @@ class JTNMTest(GenericTest):
                 timestamp = r.headers["X-Paging-Timestamp"]
             if "Location" not in r.headers:
                 raise NMOSTestException(fail(test, "Registration API failed to return a 'Location' response header"))
-            # TODO check why resource/{}s/{} in ISO402 version. Fails here, works there
-            path = "{}resource/{}/{}".format(urlparse(reg_url).path, type, data["id"])
+            path = "{}resource/{}s/{}".format(urlparse(reg_url).path, type, data["id"])
             location = r.headers["Location"]
             if path not in location:
                 raise NMOSTestException(fail(test, "Registration API 'Location' response header is incorrect: "
