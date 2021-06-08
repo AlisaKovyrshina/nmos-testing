@@ -2,28 +2,21 @@ import time
 import json
 import socket
 import uuid
-import requests
 import inspect
 import threading
 import random
-from time import sleep
 from copy import deepcopy
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 from dnslib import QTYPE
-from OpenSSL import crypto
-from requests.sessions import Request
 from zeroconf_monkey import ServiceBrowser, ServiceInfo, Zeroconf
 
 from ..GenericTest import GenericTest, NMOSTestException, NMOSInitException
-from ..IS04Utils import IS04Utils
 from .. import Config as CONFIG
-from zeroconf_monkey import ServiceBrowser, Zeroconf
 from ..MdnsListener import MdnsListener
-from ..TestHelper import get_default_ip, load_resolved_schema
+from ..TestHelper import get_default_ip
 from ..TestResult import Test
 
 from flask import Flask, render_template, make_response, abort, Blueprint, flash, request, Response, session
-import random
 
 JTNM_API_KEY = "client-testing"
 REG_API_KEY = "registration"
@@ -58,34 +51,21 @@ class JTNMTest(GenericTest):
     """
     Testing initial set up of new test suite for controller testing
     """
-    test_list = {}
-    
     def __init__(self, apis, registries, dns_server):
         # JRT: overwrite the spec_path parameter to prevent GenericTest from attempting to download RAML from repo
         apis["client-testing"]["spec_path"] = None
         GenericTest.__init__(self, apis)
         self.authorization = False  # System API doesn't use auth, so don't send tokens in every request
         self.primary_registry = registries[1]
-        self.registries = registries[1:]
         self.dns_server = dns_server
-        self.jtnm_url = self.apis[JTNM_API_KEY]["url"]
-        self.registry_basics_done = False
-        self.registry_basics_data = []
-        self.registry_primary_data = None
-        self.registry_invalid_data = None
-        self.node_basics_data = {
-            "self": None, "devices": None, "sources": None,
-            "flows": None, "senders": None, "receivers": None
-        }
+        self.registry_mdns = []
         self.zc = None
         self.zc_listener = None
-        self.is04_utils = IS04Utils(self.jtnm_url)
         self.registry_location = ''
         self.question_timeout = 30 # seconds
         self.test_data = self.load_resource_data()
 
     def set_up_tests(self):
-        print('Setting up tests')
         self.zc = Zeroconf()
         self.zc_listener = MdnsListener(self.zc)
         if self.dns_server:
@@ -104,68 +84,32 @@ class JTNMTest(GenericTest):
             # Wait for a short time to allow the device to react after performing the query
             time.sleep(CONFIG.API_PROCESSING_TIMEOUT)
 
-        if self.registry_basics_done:
-            return
-
         if CONFIG.DNS_SD_MODE == "multicast":
-            registry_mdns = []
             priority = 100
 
-            # Add advertisement for primary and failover registries
-            for registry in self.registries[0:-1]:
-                info = self._registry_mdns_info(registry.get_data().port, priority)
-                registry_mdns.append(info)
-                priority += 10
+            # Add advertisement for primary registry
+            info = self._registry_mdns_info(self.primary_registry.get_data().port, priority)
+            self.registry_mdns.append(info)
 
-            # Add the final real registry advertisement
-            info = self._registry_mdns_info(self.registries[-1].get_data().port, priority)
-            registry_mdns.append(info)
-
-        # Reset all registries to clear previous heartbeats, etc.
-        for registry in self.registries:
-            registry.reset()
-
+        # Reset registry to clear previous heartbeats, etc.
+        self.primary_registry.reset()
         self.primary_registry.enable()
         self.registry_location = 'http://' + get_default_ip() + ':' + str(self.primary_registry.get_data().port) + '/'
 
         if CONFIG.DNS_SD_MODE == "multicast":
-            self.zc.register_service(registry_mdns[0])
-            self.zc.register_service(registry_mdns[1])
-            self.zc.register_service(registry_mdns[2])
-
-        # Once registered, advertise all other registries at different (ascending) priorities
-        for index, registry in enumerate(self.registries[1:]):
-            registry.enable()
-
-        if CONFIG.DNS_SD_MODE == "multicast":
-            for info in registry_mdns[3:]:
-                self.zc.register_service(info)
+            self.zc.register_service(self.registry_mdns[0])
 
         print('Registry should be available at ' + self.registry_location)
 
-        # Add mock data to the resistry
-        # self.primary_registry.add_resource("device", "device0", "{id: 'device0'}")
-        # self.primary_registry.add_resource("device", "device1", "{id: 'device1'}")
-        # self.primary_registry.add_resource("device", "device2", "{id: 'device2'}")
-
     def tear_down_tests(self):
-        print('Tearing down tests')
         # Clean up mDNS advertisements and disable registries
-        # if CONFIG.DNS_SD_MODE == "multicast":
-        #     for info in registry_mdns:
-        #         self.zc.unregister_service(info)
-
+        if CONFIG.DNS_SD_MODE == "multicast":
+            for info in self.registry_mdns:
+                self.zc.unregister_service(info)
+        self.primary_registry.disable()
+        
         # Reset the state of the client testing façade
         self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json={"clear": "True"})
-
-        for index, registry in enumerate(self.registries):
-            registry.disable()
-
-        self.registry_basics_done = True
-        for registry in self.registries:
-            self.registry_basics_data.append(registry.get_data())
-
-        self.registry_primary_data = self.registry_basics_data[0]
 
         if self.zc:
             self.zc.close()
@@ -174,7 +118,7 @@ class JTNMTest(GenericTest):
             self.dns_server.reset()
 
         self.registry_location = ''
-        JTNMTest.test_list = {}
+        self.registry_mdns = []
 
     def execute_tests(self, test_names):
         """Perform tests defined within this class"""
@@ -224,13 +168,6 @@ class JTNMTest(GenericTest):
             
         return clientfacade_answer_json['answer_response']
 
-    def get_jtnm_json(self):
-        """
-        GET request to jtnm test suite to check for answer in JSON
-        """
-        valid, response = self.do_request("GET", self.apis[JTNM_API_KEY]["url"])
-        return response.json()
-
     def _registry_mdns_info(self, port, priority=0, api_ver=None, api_proto=None, api_auth=None, ip=None):
         """Get an mDNS ServiceInfo object in order to create an advertisement"""
         if api_ver is None:
@@ -257,45 +194,6 @@ class JTNMTest(GenericTest):
                            properties=txt, server=hostname)
         return info
     
-    def do_registry_basics_prereqs(self):
-        """Advertise a registry and collect data from any Nodes which discover it"""
-
-        if self.registry_basics_done:
-            return
-
-        if CONFIG.DNS_SD_MODE == "multicast":
-            registry_mdns = []
-            priority = 100
-
-            # Add advertisement for primary and failover registries
-            for registry in self.registries[0:-1]:
-                info = self._registry_mdns_info(registry.get_data().port, priority)
-                registry_mdns.append(info)
-                priority += 10
-
-            # Add the final real registry advertisement
-            info = self._registry_mdns_info(self.registries[-1].get_data().port, priority)
-            registry_mdns.append(info)
-
-        # Reset all registries to clear previous heartbeats, etc.
-        for registry in self.registries:
-            registry.reset()
-
-        self.primary_registry.enable()
-
-        if CONFIG.DNS_SD_MODE == "multicast":
-            self.zc.register_service(registry_mdns[0])
-            self.zc.register_service(registry_mdns[1])
-            self.zc.register_service(registry_mdns[2])
-
-        # Once registered, advertise all other registries at different (ascending) priorities
-        for index, registry in enumerate(self.registries[1:]):
-            registry.enable()
-
-        if CONFIG.DNS_SD_MODE == "multicast":
-            for info in registry_mdns[3:]:
-                self.zc.register_service(info)
-
     def load_resource_data(self):
         """Loads test data from files"""
         api = self.apis[JTNM_API_KEY]
