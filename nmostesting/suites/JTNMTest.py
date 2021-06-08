@@ -200,7 +200,7 @@ class JTNMTest(GenericTest):
         result_data = dict()
         resources = ["node", "device", "source", "flow", "sender", "receiver"]
         for resource in resources:
-            with open("test_data/IS0402/v1.3_{}.json".format(resource)) as resource_data:
+            with open("test_data/JTNM/v1.3_{}.json".format(resource)) as resource_data:
                 resource_json = json.load(resource_data)
                 result_data[resource] = resource_json
 
