@@ -293,14 +293,15 @@ class JTNMTest(GenericTest):
 
     def randomise_answers(self, no_of_answers, max_choices=1):
         """
-        no_of_answers: Length of possible_answers list minus 1
+        no_of_answers: Length of possible_answers list
         max_choices: default 1 for radio answers. No. of list indices to be returned
         max_choices > 1 will return list of random number of list indices up to the value given
         """
         if max_choices == 1:
-            return [random.randint(0, no_of_answers)]
+            return [random.randint(0, no_of_answers-1)]
         elif max_choices > 1:
             choices = random.randint(1, max_choices)
+            print('No. of answers: ', no_of_answers, 'No. of choices: ', choices)
             return random.sample(list(range(0, no_of_answers)), k=choices)
         # Do I need to add conditions here for negative numbers of choices, or choices greater
         # than number of answers or can we trust people writing tests to use it properly?
@@ -359,10 +360,19 @@ class JTNMTest(GenericTest):
 
     def test_04(self, test):
         """
-        Connect controller to mock registry and verify nodes
+        Ensure BCuT can access the IS-04 Query API
         """
-        self.post_resource(test, "node")
+        labels = ['Test node A', 'Test node B', 'Test node C']
+        answer_index = self.randomise_answers(len(labels), 3)
+        answer_list = [labels[i] for i in answer_index]
+        
+        for i in answer_index:
+            device_data = self.post_super_resources_and_resource(test, "node", "test_04")
+            device_data['label'] = labels[i]
+            self.post_resource(test, "node", device_data, codes=[200])
+        
         try:
+            # Question 1 connection
             question = "Connect your controller to the Query API at " + self.registry_location + \
                        "x-nmos/query/v1.3"
             possible_answers = []
@@ -376,54 +386,25 @@ class JTNMTest(GenericTest):
                 # Else probably isn't necessary here as there is no 'incorrect' answer. 
                 # There are no other buttons. If Next button isn't used, test will time out
 
-                return test.FAIL('Registry not found')
+                return test.FAIL('Failed to confirm connection')
 
+            # Question 2 Number of nodes
             question = "How many test nodes are connected?"
             possible_answers = ['0', '1', '2', '3']
     
             actual_answer = self.invoke_client_facade("test_04", question, possible_answers, 
                                                       test_type="radio", timeout=90)
 
-            if actual_answer == possible_answers[1]:
-                return test.PASS('Nodes in mock registry correctly identified')
-            else:
-                return test.FAIL('Incorrect number of nodes found')
-        except ClientFacadeException as e:
-            return test.UNCLEAR(e.args[0])
-
-    def test_05(self, test):
-        """
-        Identify devices in registry
-        """
-        # Potential devices to be added to registry
-        labels = ['Test device 1', 'Test device 2', 'Test device A', 'Test device B']
-        # Pick up to 2 labels
-        answer_index = self.randomise_answers(len(labels)-1, 2)
-        answer_list = [labels[i] for i in answer_index]
-
-        # Post new resources to registry
-        for i in answer_index:
-            device_data = self.post_super_resources_and_resource(test, "device", "test_05")
-            device_data['label'] = labels[i]
-            self.post_resource(test, "device", device_data, codes=[200])
-
-        try:
-            question = "Connect your controller to the Query API at " + self.registry_location + \
-                       "x-nmos/query/v1.3 How many devices are available?"
-            possible_answers = ['0', '1', '2', '3', '4']
-
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
-                                                      test_type="radio", timeout=90)
-
             if actual_answer == str(len(answer_list)):
                 pass
             else:
-                return test.FAIL('Incorrect number of devices found', actual_answer)
+                return test.FAIL('Incorrect number of nodes identified')
 
-            question = "Which of the following devices are available?"
+            # Question 3 Identify nodes by label
+            question = "Which of the following nodes are available?"
             possible_answers = labels
 
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
+            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, 
                                                       test_type="checkbox", timeout=90)
 
             # Checkbox answers come as lists
@@ -431,7 +412,103 @@ class JTNMTest(GenericTest):
                 if answer in answer_list:
                     pass
                 else:
-                    return test.FAIL('Incorrect device identified')
-            return test.PASS('Devices correctly identified')
+                    return test.FAIL('Incorrect node identified')
+            return test.PASS('Nodes correctly identified')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
+
+    def test_05(self, test):
+        """
+        Query API should be able to discover all the devices that are registered in the Registry
+        """
+        # Potential devices to be added to registry
+        sender_labels = ['Test-node-1/sender/a1', 'Test-node-1/sender/b0', 'Test-node-1/sender/b1']
+        receiver_labels = ['Test-node-2/receiver/s0', 'Test-node-2/receiver/s1', 'Test-node-2/receiver/t0']
+        # Pick up to 3 labels
+        sender_answer_index = self.randomise_answers(len(sender_labels), 3)
+        sender_answer_list = [sender_labels[i] for i in sender_answer_index]
+
+        receiver_answer_index = self.randomise_answers(len(receiver_labels), 3)
+        receiver_answer_list = [receiver_labels[i] for i in receiver_answer_index]  
+
+        # Post new resources to registry
+        for i in sender_answer_index:
+            device_data = self.post_super_resources_and_resource(test, "sender", "test_05")
+            device_data['label'] = sender_labels[i]
+            self.post_resource(test, "sender", device_data, codes=[200])
+
+        for i in receiver_answer_index:
+            device_data = self.post_super_resources_and_resource(test, "receiver", "test_05")
+            device_data['label'] = receiver_labels[i]
+            self.post_resource(test, "receiver", device_data, codes=[200])
+
+        try:
+            # Question 1 connection
+            question = "Connect your controller to the Query API at " + self.registry_location + \
+                       "x-nmos/query/v1.3"
+            possible_answers = []
+
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
+                                                      test_type="action", timeout=120)
+
+            if actual_answer == 'Next':
+                pass
+            else:
+                # Else probably isn't necessary here as there is no 'incorrect' answer. 
+                # There are no other buttons. If Next button isn't used, test will time out
+
+                return test.FAIL('Failed to confirm connection')
+            
+            # Question 2 Number of senders 
+            question = "How many senders are available?"
+            possible_answers = ['0', '1', '2', '3']
+
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
+                                                      test_type="radio", timeout=90)
+
+            if actual_answer == str(len(sender_answer_list)):
+                pass
+            else:
+                return test.FAIL('Incorrect number of senders identified')
+
+            # Question 3 Identify senders by label
+            question = "Which of the following senders are available?"
+            possible_answers = sender_labels
+
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
+                                                      test_type="checkbox", timeout=90)
+
+            for answer in actual_answer:
+                if answer in sender_answer_list:
+                    pass
+                else:
+                    return test.FAIL('Incorrect sender identified')
+
+            # Question 4 Number of receivers 
+            question = "How many receivers are available?"
+            possible_answers = ['0', '1', '2', '3']
+
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
+                                                      test_type="radio", timeout=90)
+
+            if actual_answer == str(len(receiver_answer_list)):
+                pass
+            else:
+                return test.FAIL('Incorrect number of receivers identified')
+
+            # Question 5 Identify receivers by label
+            question = "Which of the following receivers are available?"
+            possible_answers = receiver_labels
+
+            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
+                                                      test_type="checkbox", timeout=90)
+
+            for answer in actual_answer:
+                if answer in receiver_answer_list:
+                    pass
+                else:
+                    return test.FAIL('Incorrect receiver identified')
+
+            return test.PASS('All devices correctly identified')
         except ClientFacadeException as e:
             return test.UNCLEAR(e.args[0])
