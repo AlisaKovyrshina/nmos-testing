@@ -60,7 +60,7 @@
 
         function checkForQuestion() {
             $.ajax({
-                url: "{{ url_for('jtnm_tests') }}",
+                url: "{{ url_for('jtnm_tests_get') }}",
                 success: function(data) {
                     if (data['name']) {
                         window.location.reload();

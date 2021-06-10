@@ -52,8 +52,8 @@ class JTNMTest(GenericTest):
     Testing initial set up of new test suite for controller testing
     """
     def __init__(self, apis, registries, dns_server):
-        # JRT: overwrite the spec_path parameter to prevent GenericTest from attempting to download RAML from repo
-        apis["client-testing"]["spec_path"] = None
+        # JRT: remove the spec_path parameter to prevent GenericTest from attempting to download RAML from repo
+        apis[JTNM_API_KEY].pop("spec_path", None)
         GenericTest.__init__(self, apis)
         self.authorization = False  # System API doesn't use auth, so don't send tokens in every request
         self.primary_registry = registries[1]
