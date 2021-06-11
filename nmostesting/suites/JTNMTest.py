@@ -198,7 +198,7 @@ class JTNMTest(GenericTest):
         """Loads test data from files"""
         api = self.apis[JTNM_API_KEY]
         result_data = dict()
-        resources = ["node", "device", "source", "flow", "sender", "receiver"]
+        resources = ["node", "device", "source", "flow", "sender", "receiver", "device_nocontrol"]
         for resource in resources:
             with open("test_data/JTNM/v1.3_{}.json".format(resource)) as resource_data:
                 resource_json = json.load(resource_data)
@@ -252,7 +252,7 @@ class JTNMTest(GenericTest):
 
         return location, timestamp
 
-    def post_super_resources_and_resource(self, test, type, description, fail=Test.FAIL):
+    def post_super_resources_and_resource(self, test, type, description, nocontrol=False, fail=Test.FAIL):
         """
         Perform POST requests on the Registration API to create the super-resource registrations
         for the requested type, before performing a POST request to create that resource registration
@@ -263,28 +263,30 @@ class JTNMTest(GenericTest):
         data["id"] = str(uuid.uuid4())
         data["description"] = description
 
+        device_type = "device_nocontrol" if nocontrol else "device"
+
         if type == "node":
             pass
         elif type == "device":
-            node = self.post_super_resources_and_resource(test, "node", description, fail=Test.UNCLEAR)
+            node = self.post_super_resources_and_resource(test, "node", description, nocontrol, fail=Test.UNCLEAR)
             data["node_id"] = node["id"]
             data["senders"] = []  # or add an id here, and use it when posting the sender?
             data["receivers"] = []  # or add an id here, and use it when posting the receiver?
         elif type == "source":
-            device = self.post_super_resources_and_resource(test, "device", description, fail=Test.UNCLEAR)
+            device = self.post_super_resources_and_resource(test, device_type, description, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
         elif type == "flow":
-            source = self.post_super_resources_and_resource(test, "source", description, fail=Test.UNCLEAR)
+            source = self.post_super_resources_and_resource(test, "source", description, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = source["device_id"]
             data["source_id"] = source["id"]
             # since device_id is v1.1, downgrade
             data = self.downgrade_resource(type, data, self.apis[REG_API_KEY]["version"])
         elif type == "sender":
-            device = self.post_super_resources_and_resource(test, "device", description, fail=Test.UNCLEAR)
+            device = self.post_super_resources_and_resource(test, device_type, description, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
             data["flow_id"] = str(uuid.uuid4())  # or post a flow first and use its id here?
         elif type == "receiver":
-            device = self.post_super_resources_and_resource(test, "device", description, fail=Test.UNCLEAR)
+            device = self.post_super_resources_and_resource(test, device_type, description, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
 
         self.post_resource(test, type, data, codes=[201], fail=fail)
