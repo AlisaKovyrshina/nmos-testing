@@ -410,11 +410,13 @@ class JTNMTest(GenericTest):
                                                       test_type="checkbox", timeout=90)
 
             # Checkbox answers come as lists
-            for answer in actual_answer:
-                if answer in answer_list:
-                    pass
-                else:
-                    return test.FAIL('Incorrect node identified')
+            if len(actual_answer) != len(answer_list):
+                return test.FAIL('Incorrect node identified')
+            else:
+                for answer in actual_answer:
+                    if answer not in answer_list:
+                        return test.FAIL('Incorrect node identified')
+
             return test.PASS('Nodes correctly identified')
         except ClientFacadeException as e:
             return test.UNCLEAR(e.args[0])
@@ -480,11 +482,12 @@ class JTNMTest(GenericTest):
             actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
                                                       test_type="checkbox", timeout=90)
 
-            for answer in actual_answer:
-                if answer in sender_answer_list:
-                    pass
-                else:
-                    return test.FAIL('Incorrect sender identified')
+            if len(actual_answer) != len(sender_answer_list):
+                return test.FAIL('Incorrect sender identified')
+            else:
+                for answer in actual_answer:
+                    if answer not in sender_answer_list:
+                        return test.FAIL('Incorrect sender identified')
 
             # Question 4 Number of receivers 
             question = "How many receivers are available?"
@@ -505,11 +508,12 @@ class JTNMTest(GenericTest):
             actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
                                                       test_type="checkbox", timeout=90)
 
-            for answer in actual_answer:
-                if answer in receiver_answer_list:
-                    pass
-                else:
-                    return test.FAIL('Incorrect receiver identified')
+            if len(actual_answer) != len(receiver_answer_list):
+                return test.FAIL('Incorrect receiver identified')
+            else:
+                for answer in actual_answer:
+                    if answer not in receiver_answer_list:
+                        return test.FAIL('Incorrect receiver identified')
 
             return test.PASS('All devices correctly identified')
         except ClientFacadeException as e:
