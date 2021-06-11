@@ -185,6 +185,10 @@ REGISTRIES = [Registry(REGISTRY_COMMON, i + 1) for i in range(NUM_REGISTRIES)]
 REGISTRY_API = Blueprint('registry_api', __name__)
 
 
+def createCORSResponse(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
+
 # IS-04 resources
 @REGISTRY_API.route('/x-nmos/registration/<version>', methods=["GET"], strict_slashes=False)
 def base_resource(version):
@@ -196,7 +200,8 @@ def base_resource(version):
         abort(authorized)
     base_data = ["resource/", "health/"]
     # Using json.dumps to support older Flask versions http://flask.pocoo.org/docs/1.0/security/#json-security
-    return Response(json.dumps(base_data), mimetype='application/json')
+    
+    return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))
 
 
 @REGISTRY_API.route('/x-nmos/registration/<version>/resource', methods=["POST"])
@@ -294,7 +299,7 @@ def query(version):
     for resource in resources:
         base_data.append(flask.url_for('.query_resource', version=version, resource=resource))
 
-    return Response(json.dumps(base_data), mimetype='application/json')
+    return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))
 
 
 @REGISTRY_API.route('/x-nmos/query/<version>/<resource>', methods=["GET"], strict_slashes=False)
@@ -316,7 +321,8 @@ def query_resource(version, resource):
     except Exception:
         pass
 
-    return Response(json.dumps(base_data), mimetype='application/json')
+    return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))
+
 
 
 @REGISTRY_API.route('/x-nmos/query/<version>/<resource>/<resource_id>', methods=['GET'], strict_slashes=False)
@@ -336,10 +342,12 @@ def get_resource(version, resource, resource_id):
     except Exception:
         pass
 
-    return Response(json.dumps(base_data), mimetype='application/json')
+    return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))
+
 
 
 @REGISTRY_API.route('/', methods=["GET"], strict_slashes=False)
 def base():
     base_data = ["I'm a mock registry"]
-    return Response(json.dumps(base_data), mimetype='application/json')
+    return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))
+
