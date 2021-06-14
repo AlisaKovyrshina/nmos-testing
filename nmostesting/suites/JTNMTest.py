@@ -232,7 +232,6 @@ class JTNMTest(GenericTest):
         if not valid:
             raise NMOSTestException(fail(test, "Registration API returned an unexpected response: {}".format(r)))
 
-        print(type, data['description'], r)
         self.test_resources.append(data)
 
         location = None
@@ -274,6 +273,8 @@ class JTNMTest(GenericTest):
         data["description"] = description
 
         device_type = "device_nocontrol" if nocontrol else "device"
+        if type == "device_nocontrol":
+            type = "device"
 
         if type == "node":
             pass
@@ -299,8 +300,8 @@ class JTNMTest(GenericTest):
             device = self.post_super_resources_and_resource(test, device_type, description, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
 
-        loc, timestamp = self.post_resource(test, type, data, codes=[201], fail=fail)
-        print(type, loc, timestamp)
+        self.post_resource(test, type, data, codes=[201], fail=fail)
+
         return data
 
     def randomise_answers(self, no_of_answers, max_choices=1):
@@ -578,7 +579,7 @@ class JTNMTest(GenericTest):
                 device_data = self.post_super_resources_and_resource(test, "sender", "test_06", nocontrol=True)
             device_data['label'] = label
             self.post_resource(test, "sender", device_data, codes=[200])
-        print('*** Resources for test 06 ***', self.test_resources)
+
         try:
             # Question 1 connection
             question = "Connect your controller to the Query API at " + self.registry_location + \
@@ -586,7 +587,7 @@ class JTNMTest(GenericTest):
             possible_answers = []
 
             actual_answer = self.invoke_client_facade("test_06", question, possible_answers, 
-                                                      test_type="action", timeout=120)
+                                                      test_type="action", timeout=180)
             
             if actual_answer == 'Next':
                 # TODO make this pass and add extra question to confirm connectable nodes
