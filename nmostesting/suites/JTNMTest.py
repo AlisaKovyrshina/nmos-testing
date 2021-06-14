@@ -274,7 +274,7 @@ class JTNMTest(GenericTest):
 
         device_type = "device_nocontrol" if nocontrol else "device"
         if type == "device_nocontrol":
-            type = "device"
+           type = "device"
 
         if type == "node":
             pass
@@ -349,59 +349,19 @@ class JTNMTest(GenericTest):
         except ClientFacadeException as e:
             # pre_test_introducton timed out
             pass
+    
     def test_01(self, test):
         """
-        Example test 1
+        Ensure BCuT uses DNS-SD to find registry
         """
-        try:
-            question = 'What is your name?'
-            possible_answers = ['Sir Robin of Camelot', 'Sir Galahad of Camelot', 'Arthur, King of the Britons']
+        if not CONFIG.ENABLE_DNS_SD or CONFIG.DNS_SD_MODE != "multicast":
+            return test.DISABLED("This test cannot be performed when ENABLE_DNS_SD is False or DNS_SD_MODE is not "
+                                 "'multicast'")
 
-            actual_answer = self.invoke_client_facade("test_01", question, possible_answers, test_type="radio")
+        return test.DISABLED("Test not yet implemented")
 
-            if actual_answer == possible_answers[2]:
-                return test.PASS('I didn\'t vote for him')
-            else:
-                return test.FAIL('Knight of the round table')
-        except ClientFacadeException as e:
-                return test.UNCLEAR(e.args[0])
 
     def test_02(self, test):
-        """
-        Example test 2
-        """
-        try:
-            question = 'What is your Quest?'
-            possible_answers = ['To find a shrubbery', 'To seek the Holy Grail']
-
-            actual_answer = self.invoke_client_facade("test_02", question, possible_answers, test_type="radio")
-
-            if actual_answer == possible_answers[1]:
-                return test.PASS('The Grail awaits')
-            else:
-                return test.FAIL('Ni')
-        except ClientFacadeException as e:
-            return test.UNCLEAR(e.args[0])
-
-    def test_03(self, test):
-        """
-        Example test 3
-        """
-        try:
-            question = 'What is your favourite colour?'
-            possible_answers = ['Blue', 'Yellow']
-
-            actual_answer = self.invoke_client_facade("test_03", question, possible_answers, test_type="radio")
-
-            if actual_answer == possible_answers[1]:
-                return test.PASS('Off you go then')
-            else:
-                return test.FAIL('Ahhhhhhhhh')
-        except ClientFacadeException as e:
-            return test.UNCLEAR(e.args[0])
-
-
-    def test_04(self, test):
         """
         Ensure BCuT can access the IS-04 Query API
         """
