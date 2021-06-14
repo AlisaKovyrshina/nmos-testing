@@ -8,6 +8,7 @@ import random
 from copy import deepcopy
 from urllib.parse import urlparse
 from dnslib import QTYPE
+from git.objects.base import IndexObject
 from zeroconf_monkey import ServiceBrowser, ServiceInfo, Zeroconf
 
 from ..GenericTest import GenericTest, NMOSTestException, NMOSInitException
@@ -64,6 +65,7 @@ class JTNMTest(GenericTest):
         self.registry_location = ''
         self.question_timeout = 30 # seconds
         self.test_data = self.load_resource_data()
+        self.test_resources = [] # Reference store for new resources created within a test
 
     def set_up_tests(self):
         self.zc = Zeroconf()
@@ -124,8 +126,10 @@ class JTNMTest(GenericTest):
         """Perform tests defined within this class"""
 
         for test_name in test_names:
+            self.test_resources.clear()
             self.primary_registry.reset()
             self.primary_registry.enable()
+
             self.execute_test(test_name)
     
     def invoke_client_facade(self, test, question, answers, test_type, timeout=None):
@@ -225,6 +229,9 @@ class JTNMTest(GenericTest):
         if not valid:
             raise NMOSTestException(fail(test, "Registration API returned an unexpected response: {}".format(r)))
 
+        print(type, data['description'], r)
+        self.test_resources.append(data)
+
         location = None
         timestamp = None
 
@@ -289,8 +296,8 @@ class JTNMTest(GenericTest):
             device = self.post_super_resources_and_resource(test, device_type, description, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
 
-        self.post_resource(test, type, data, codes=[201], fail=fail)
-
+        loc, timestamp = self.post_resource(test, type, data, codes=[201], fail=fail)
+        print(type, loc, timestamp)
         return data
 
     def randomise_answers(self, no_of_answers, max_choices=1):
@@ -303,10 +310,7 @@ class JTNMTest(GenericTest):
             return [random.randint(0, no_of_answers-1)]
         elif max_choices > 1:
             choices = random.randint(1, max_choices)
-            print('No. of answers: ', no_of_answers, 'No. of choices: ', choices)
             return random.sample(list(range(0, no_of_answers)), k=choices)
-        # Do I need to add conditions here for negative numbers of choices, or choices greater
-        # than number of answers or can we trust people writing tests to use it properly?
 
     def test_01(self, test):
         """
@@ -516,5 +520,46 @@ class JTNMTest(GenericTest):
                         return test.FAIL('Incorrect receiver identified')
 
             return test.PASS('All devices correctly identified')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
+
+    def test_06(self, test):
+        "Identify which Receiver devices are controllable via IS-05"
+        # Potential devices to be added to registry
+        sender_labels = ['Test-node-1/sender/a0', 'Test-node-1/sender/a1', 'Test-node-1/sender/b0', 'Test-node-1/sender/b1']
+        # receiver_labels = ['Test-node-2/receiver/s0', 'Test-node-2/receiver/s1', 'Test-node-2/receiver/t0']
+        # Pick up to 3 labels
+        sender_answer_index = self.randomise_answers(len(sender_labels), 3)
+        sender_answer_list = [sender_labels[i] for i in sender_answer_index]
+
+        # Post new resources to registry
+        for index, label in enumerate(sender_labels):
+            if index in sender_answer_index:
+                # These should be connectable
+                device_data = self.post_super_resources_and_resource(test, "sender", "test_06con")
+            else:
+                # These shouldn't
+                device_data = self.post_super_resources_and_resource(test, "sender", "test_06", nocontrol=True)
+            device_data['label'] = label
+            self.post_resource(test, "sender", device_data, codes=[200])
+        print('*** Resources for test 06 ***', self.test_resources)
+        try:
+            # Question 1 connection
+            question = "Connect your controller to the Query API at " + self.registry_location + \
+                       "x-nmos/query/v1.3"
+            possible_answers = []
+
+            actual_answer = self.invoke_client_facade("test_06", question, possible_answers, 
+                                                      test_type="action", timeout=120)
+            
+            if actual_answer == 'Next':
+                # TODO make this pass and add extra question to confirm connectable nodes
+                return test.PASS('Connected')
+            else:
+                # Else probably isn't necessary here as there is no 'incorrect' answer. 
+                # There are no other buttons. If Next button isn't used, test will time out
+
+                return test.FAIL('Failed to confirm connection')
+            # TODO Figure out how to identify nodes when set up is labelling senders
         except ClientFacadeException as e:
             return test.UNCLEAR(e.args[0])
