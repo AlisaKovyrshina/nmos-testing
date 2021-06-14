@@ -63,7 +63,7 @@ class JTNMTest(GenericTest):
         self.zc = None
         self.zc_listener = None
         self.registry_location = ''
-        self.question_timeout = 30 # seconds
+        self.question_timeout = 600 # seconds
         self.test_data = self.load_resource_data()
         self.test_resources = [] # Reference store for new resources created within a test
 
@@ -124,6 +124,7 @@ class JTNMTest(GenericTest):
 
     def execute_tests(self, test_names):
         """Perform tests defined within this class"""
+        self.pre_test_message()
 
         for test_name in test_names:
             self.test_resources.clear()
@@ -131,7 +132,9 @@ class JTNMTest(GenericTest):
             self.primary_registry.enable()
 
             self.execute_test(test_name)
-    
+
+        self.post_test_message()
+
     def invoke_client_facade(self, test, question, answers, test_type, timeout=None):
 
         global clientfacade_answer_json
@@ -312,6 +315,39 @@ class JTNMTest(GenericTest):
             choices = random.randint(1, max_choices)
             return random.sample(list(range(0, no_of_answers)), k=choices)
 
+    def pre_test_message(self):
+        """
+        Introduction to JT-NM Tested Test Suite
+        """
+        question =  'This set of tests validates a Broadcast Controller under Test’s (BCuT) ability to query an IS-04 ' \
+        'Registry with the IS-04 Query API and to control a Media Node using the IS-05 Connection ' \
+        'Management API.\r\n\r\nA Test AMWA IS-04 v1.2/1.3 reference registration is available on the network, ' \
+        'and advertised in the DNS server via unicast DNS-SD\r\n\r\n' \
+        'Although the test AMWA IS-04 registraton service should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
+        'it is also possible to reach the service via the following URL:\r\n\r\n' + self.registry_location + 'x-nmos/query/v1.3\r\n\r\n' \
+        'Once the BCuT has located the test AMWA IS-04 registration service, please click \'Next\''
+        possible_answers=[]
+
+        try:
+            actual_answer = self.invoke_client_facade("pre_test_message", question, possible_answers, test_type="action", timeout=600)
+
+        except ClientFacadeException as e:
+            # pre_test_introducton timed out
+            pass
+
+    def post_test_message(self):
+        """
+        JT-NM Tested Test Suite testing complete!
+        """
+        question =  'JT-NM Tested Test Suite testing complete!\r\n\r\nPlease press \'Next\' to exit the tests'
+        possible_answers=[]
+
+        try:
+            actual_answer = self.invoke_client_facade("post_test_message", question, possible_answers, test_type="action", timeout=10)
+
+        except ClientFacadeException as e:
+            # pre_test_introducton timed out
+            pass
     def test_01(self, test):
         """
         Example test 1
