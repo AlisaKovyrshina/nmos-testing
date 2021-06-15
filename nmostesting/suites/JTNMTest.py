@@ -121,19 +121,60 @@ class JTNMTest(GenericTest):
 
         self.registry_location = ''
         self.registry_mdns = []
+    
+    def set_up_test(self):
+        """Setup performed before EACH test"""
+        self.test_resources.clear()
+        self.primary_registry.reset()
+        self.primary_registry.enable()
 
     def execute_tests(self, test_names):
         """Perform tests defined within this class"""
-        self.pre_test_message()
+        self.pre_tests_message()
 
         for test_name in test_names:
-            self.test_resources.clear()
-            self.primary_registry.reset()
-            self.primary_registry.enable()
-
             self.execute_test(test_name)
 
-        self.post_test_message()
+        self.post_tests_message()
+
+    def execute_test(self, test_name):
+        """Perform a test defined within this class"""
+        self.test_individual = (test_name != "all")
+
+        # Run automatically defined tests
+        if test_name in ["auto", "all"] and not self.disable_auto:
+            print(" * Running basic API tests")
+            self.result += self.basics()
+
+        # Run manually defined tests
+        if test_name == "all":
+            for method_name in dir(self):
+                if method_name.startswith("test_"):
+                    method = getattr(self, method_name)
+                    if callable(method):
+                        print(" * Running " + method_name)
+                        test = Test(inspect.getdoc(method), method_name)
+                        try:
+                            self.set_up_test()
+                            self.result.append(method(test))
+                        except NMOSTestException as e:
+                            self.result.append(e.args[0])
+                        except Exception as e:
+                            self.result.append(self.uncaught_exception(method_name, e))
+
+        # Run a single test
+        if test_name != "auto" and test_name != "all":
+            method = getattr(self, test_name)
+            if callable(method):
+                print(" * Running " + test_name)
+                test = Test(inspect.getdoc(method), test_name)
+                try:
+                    self.set_up_test()
+                    self.result.append(method(test))
+                except NMOSTestException as e:
+                    self.result.append(e.args[0])
+                except Exception as e:
+                    self.result.append(self.uncaught_exception(test_name, e))
 
     def invoke_client_facade(self, test, question, answers, test_type, timeout=None):
 
@@ -157,6 +198,9 @@ class JTNMTest(GenericTest):
         }
         # Send questions to jtnm testing API endpoint then wait
         valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json=json_out)
+
+        if not valid:
+            raise ClientFacadeException("Problem contacting Client Façade: " + response)
 
         # Wait for answer available signal or 120s then move on
         answer_available.clear()
@@ -261,7 +305,7 @@ class JTNMTest(GenericTest):
 
         return location, timestamp
 
-    def post_super_resources_and_resource(self, test, type, description, nocontrol=False, fail=Test.FAIL):
+    def post_super_resources_and_resource(self, test, type, description, sender_id=None, receiver_id=None, nocontrol=False, fail=Test.FAIL):
         """
         Perform POST requests on the Registration API to create the super-resource registrations
         for the requested type, before performing a POST request to create that resource registration
@@ -279,25 +323,29 @@ class JTNMTest(GenericTest):
         if type == "node":
             pass
         elif type == "device":
-            node = self.post_super_resources_and_resource(test, "node", description, nocontrol, fail=Test.UNCLEAR)
+            node = self.post_super_resources_and_resource(test, "node", description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
             data["node_id"] = node["id"]
-            data["senders"] = []  # or add an id here, and use it when posting the sender?
-            data["receivers"] = []  # or add an id here, and use it when posting the receiver?
+            data["senders"] = [ sender_id ] if sender_id else [] 
+            data["receivers"] = [ receiver_id ] if receiver_id else [] 
         elif type == "source":
-            device = self.post_super_resources_and_resource(test, device_type, description, nocontrol, fail=Test.UNCLEAR)
+            device = self.post_super_resources_and_resource(test, device_type, description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
         elif type == "flow":
-            source = self.post_super_resources_and_resource(test, "source", description, nocontrol, fail=Test.UNCLEAR)
+            source = self.post_super_resources_and_resource(test, "source", description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = source["device_id"]
             data["source_id"] = source["id"]
             # since device_id is v1.1, downgrade
             data = self.downgrade_resource(type, data, self.apis[REG_API_KEY]["version"])
         elif type == "sender":
-            device = self.post_super_resources_and_resource(test, device_type, description, nocontrol, fail=Test.UNCLEAR)
+            sender_id = str(uuid.uuid4())
+            data["id"] = sender_id
+            device = self.post_super_resources_and_resource(test, device_type, description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
             data["flow_id"] = str(uuid.uuid4())  # or post a flow first and use its id here?
         elif type == "receiver":
-            device = self.post_super_resources_and_resource(test, device_type, description, nocontrol, fail=Test.UNCLEAR)
+            receiver_id = str(uuid.uuid4())
+            data["id"] = receiver_id
+            device = self.post_super_resources_and_resource(test, device_type, description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
 
         self.post_resource(test, type, data, codes=[201], fail=fail)
@@ -316,7 +364,7 @@ class JTNMTest(GenericTest):
             choices = random.randint(1, max_choices)
             return random.sample(list(range(0, no_of_answers)), k=choices)
 
-    def pre_test_message(self):
+    def pre_tests_message(self):
         """
         Introduction to JT-NM Tested Test Suite
         """
@@ -324,19 +372,19 @@ class JTNMTest(GenericTest):
         'Registry with the IS-04 Query API and to control a Media Node using the IS-05 Connection ' \
         'Management API.\r\n\r\nA Test AMWA IS-04 v1.2/1.3 reference registration is available on the network, ' \
         'and advertised in the DNS server via unicast DNS-SD\r\n\r\n' \
-        'Although the test AMWA IS-04 registraton service should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
+        'Although the test AMWA IS-04 registration service should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
         'it is also possible to reach the service via the following URL:\r\n\r\n' + self.registry_location + 'x-nmos/query/v1.3\r\n\r\n' \
         'Once the BCuT has located the test AMWA IS-04 registration service, please click \'Next\''
         possible_answers=[]
 
         try:
-            actual_answer = self.invoke_client_facade("pre_test_message", question, possible_answers, test_type="action", timeout=600)
+            actual_answer = self.invoke_client_facade("pre_tests_message", question, possible_answers, test_type="action", timeout=600)
 
         except ClientFacadeException as e:
             # pre_test_introducton timed out
             pass
 
-    def post_test_message(self):
+    def post_tests_message(self):
         """
         JT-NM Tested Test Suite testing complete!
         """
@@ -344,7 +392,7 @@ class JTNMTest(GenericTest):
         possible_answers=[]
 
         try:
-            actual_answer = self.invoke_client_facade("post_test_message", question, possible_answers, test_type="action", timeout=10)
+            actual_answer = self.invoke_client_facade("post_tests_message", question, possible_answers, test_type="action", timeout=10)
 
         except ClientFacadeException as e:
             # pre_test_introducton timed out
@@ -365,123 +413,68 @@ class JTNMTest(GenericTest):
         """
         Ensure BCuT can access the IS-04 Query API
         """
-        labels = ['Test node A', 'Test node B', 'Test node C']
-        answer_index = self.randomise_answers(len(labels), 3)
-        answer_list = [labels[i] for i in answer_index]
-        
-        for i in answer_index:
-            device_data = self.post_super_resources_and_resource(test, "node", "test_04")
-            device_data['label'] = labels[i]
-            self.post_resource(test, "node", device_data, codes=[200])
-        
+        test_method_name = inspect.currentframe().f_code.co_name
+
+        # Devices to be added to registry
+        sender_labels = ['Test-node-1/sender/a1', 'Test-node-1/sender/b0', 'Test-node-1/sender/b1']
+        receiver_labels = ['Test-node-2/receiver/s0', 'Test-node-2/receiver/s1', 'Test-node-2/receiver/t0']
+
+        # Populate the registry with senders and recievers
+        for sender_label in sender_labels:
+            device_data = self.post_super_resources_and_resource(test, "sender", test_method_name)
+            device_data['label'] = sender_label
+            self.post_resource(test, "sender", device_data, codes=[200])
+
+        for receiver_label in receiver_labels:
+            device_data = self.post_super_resources_and_resource(test, "receiver", test_method_name)
+            device_data['label'] = receiver_label
+            self.post_resource(test, "receiver", device_data, codes=[200])
+            
         try:
             # Question 1 connection
-            question = "Connect your controller to the Query API at " + self.registry_location + \
-                       "x-nmos/query/v1.3"
+            question = 'Use the BCuT to browse the senders and receivers on the discovered via the selected IS-04 Query API.\n' \
+            'Once you have finished browsing click \'Next\'. Successful browsing of the registration service will be logged by the test framework.\n'
             possible_answers = []
 
-            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, 
+            actual_answer = self.invoke_client_facade(test_method_name, question, possible_answers, 
                                                       test_type="action", timeout=120)
 
-            if actual_answer == 'Next':
-                pass
-            else:
-                # Else probably isn't necessary here as there is no 'incorrect' answer. 
-                # There are no other buttons. If Next button isn't used, test will time out
+            # The registry will log calls to the Query API endpoints
+            if not self.primary_registry.query_api_called:
+                return test.FAIL('IS-04 Query API not reached')
+            
+            return test.PASS('IS-04 Query API reached successfully')
 
-                return test.FAIL('Failed to confirm connection')
-
-            # Question 2 Number of nodes
-            question = "How many test nodes are connected?"
-            possible_answers = ['0', '1', '2', '3']
-    
-            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, 
-                                                      test_type="radio", timeout=90)
-
-            if actual_answer == str(len(answer_list)):
-                pass
-            else:
-                return test.FAIL('Incorrect number of nodes identified')
-
-            # Question 3 Identify nodes by label
-            question = "Which of the following nodes are available?"
-            possible_answers = labels
-
-            actual_answer = self.invoke_client_facade("test_04", question, possible_answers, 
-                                                      test_type="checkbox", timeout=90)
-
-            # Checkbox answers come as lists
-            if len(actual_answer) != len(answer_list):
-                return test.FAIL('Incorrect node identified')
-            else:
-                for answer in actual_answer:
-                    if answer not in answer_list:
-                        return test.FAIL('Incorrect node identified')
-
-            return test.PASS('Nodes correctly identified')
         except ClientFacadeException as e:
             return test.UNCLEAR(e.args[0])
 
-    def test_05(self, test):
+    def test_03(self, test):
         """
-        Query API should be able to discover all the devices that are registered in the Registry
+        Query API should be able to discover all the senders that are registered in the Registry
         """
-        # Potential devices to be added to registry
-        sender_labels = ['Test-node-1/sender/a1', 'Test-node-1/sender/b0', 'Test-node-1/sender/b1']
-        receiver_labels = ['Test-node-2/receiver/s0', 'Test-node-2/receiver/s1', 'Test-node-2/receiver/t0']
-        # Pick up to 3 labels
-        sender_answer_index = self.randomise_answers(len(sender_labels), 3)
-        sender_answer_list = [sender_labels[i] for i in sender_answer_index]
+        test_method_name = inspect.currentframe().f_code.co_name
+        MAX_SENDERS = 3
 
-        receiver_answer_index = self.randomise_answers(len(receiver_labels), 3)
-        receiver_answer_list = [receiver_labels[i] for i in receiver_answer_index]  
+        # Potential senders to be added to registry
+        sender_labels = ['Test-node-1/sender/gilmour', 'Test-node-1/sender/waters', 'Test-node-1/sender/wright', 'Test-node-1/sender/mason', 'Test-node-1/sender/barrett']
+        # Pick up to MAX_DEVICES labels
+        sender_answer_index = self.randomise_answers(len(sender_labels), MAX_SENDERS)
+        sender_answer_list = [sender_labels[i] for i in sender_answer_index]
 
         # Post new resources to registry
         for i in sender_answer_index:
-            device_data = self.post_super_resources_and_resource(test, "sender", "test_05")
+            device_data = self.post_super_resources_and_resource(test, "sender", test_method_name)
             device_data['label'] = sender_labels[i]
             self.post_resource(test, "sender", device_data, codes=[200])
 
-        for i in receiver_answer_index:
-            device_data = self.post_super_resources_and_resource(test, "receiver", "test_05")
-            device_data['label'] = receiver_labels[i]
-            self.post_resource(test, "receiver", device_data, codes=[200])
-
         try:
-            # Question 1 connection
-            question = "Connect your controller to the Query API at " + self.registry_location + \
-                       "x-nmos/query/v1.3"
-            possible_answers = []
-
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
-                                                      test_type="action", timeout=120)
-
-            if actual_answer == 'Next':
-                pass
-            else:
-                # Else probably isn't necessary here as there is no 'incorrect' answer. 
-                # There are no other buttons. If Next button isn't used, test will time out
-
-                return test.FAIL('Failed to confirm connection')
-            
-            # Question 2 Number of senders 
-            question = "How many senders are available?"
-            possible_answers = ['0', '1', '2', '3']
-
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
-                                                      test_type="radio", timeout=90)
-
-            if actual_answer == str(len(sender_answer_list)):
-                pass
-            else:
-                return test.FAIL('Incorrect number of senders identified')
-
-            # Question 3 Identify senders by label
-            question = "Which of the following senders are available?"
+            # Check senders 
+            question = 'The Query API should be able to discover all the senders that are registered in the Registry.\n' \
+            'Refresh the BCuT\'s view of the registration service and carefully select the senders that are available from the following list.' 
             possible_answers = sender_labels
 
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
-                                                      test_type="checkbox", timeout=90)
+            actual_answer = self.invoke_client_facade(test_method_name, question, possible_answers, 
+                                                      test_type="checkbox")
 
             if len(actual_answer) != len(sender_answer_list):
                 return test.FAIL('Incorrect sender identified')
@@ -490,24 +483,38 @@ class JTNMTest(GenericTest):
                     if answer not in sender_answer_list:
                         return test.FAIL('Incorrect sender identified')
 
-            # Question 4 Number of receivers 
-            question = "How many receivers are available?"
-            possible_answers = ['0', '1', '2', '3']
+            return test.PASS('All devices correctly identified')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
 
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
-                                                      test_type="radio", timeout=90)
 
-            if actual_answer == str(len(receiver_answer_list)):
-                pass
-            else:
-                return test.FAIL('Incorrect number of receivers identified')
+    def test_04(self, test):
+        """
+        Query API should be able to discover all the receivers that are registered in the Registry
+        """
+        test_method_name = inspect.currentframe().f_code.co_name
+        MAX_RECEIVERS = 3
 
-            # Question 5 Identify receivers by label
-            question = "Which of the following receivers are available?"
+        # Potential devices to be added to registry
+        receiver_labels = ['Test-node-2/receiver/palin', 'Test-node-2/receiver/cleese', 'Test-node-2/receiver/jones', 'Test-node-2/receiver/chapman', 'Test-node-2/receiver/idle', 'Test-node-2/receiver/gilliam']
+        # Pick up to MAX_DEVICES labels
+        receiver_answer_index = self.randomise_answers(len(receiver_labels), MAX_RECEIVERS)
+        receiver_answer_list = [receiver_labels[i] for i in receiver_answer_index]  
+
+        # Post new resources to registry
+        for i in receiver_answer_index:
+            device_data = self.post_super_resources_and_resource(test, "receiver", test_method_name)
+            device_data['label'] = receiver_labels[i]
+            self.post_resource(test, "receiver", device_data, codes=[200])
+
+        try:
+            # Check receivers 
+            question = 'The Query API should be able to discover all the receivers that are registered in the Registry.\n' \
+            'Refresh the BCuT\'s view of the registration service and carefully select the senders that are available from the following list.'
             possible_answers = receiver_labels
 
-            actual_answer = self.invoke_client_facade("test_05", question, possible_answers, 
-                                                      test_type="checkbox", timeout=90)
+            actual_answer = self.invoke_client_facade(test_method_name, question, possible_answers, 
+                                                      test_type="checkbox")
 
             if len(actual_answer) != len(receiver_answer_list):
                 return test.FAIL('Incorrect receiver identified')
@@ -520,8 +527,19 @@ class JTNMTest(GenericTest):
         except ClientFacadeException as e:
             return test.UNCLEAR(e.args[0])
 
+    def test_05(self, test):
+        """
+        Reference Sender is put offline; Reference Sender is put back online
+        """
+
+        return test.DISABLED("Test not yet implemented")
+
     def test_06(self, test):
-        "Identify which Receiver devices are controllable via IS-05"
+        """
+        Identify which Receiver devices are controllable via IS-05
+        """
+        test_method_name = inspect.currentframe().f_code.co_name
+
         # Potential devices to be added to registry
         sender_labels = ['Test-node-1/sender/a0', 'Test-node-1/sender/a1', 'Test-node-1/sender/b0', 'Test-node-1/sender/b1']
         # receiver_labels = ['Test-node-2/receiver/s0', 'Test-node-2/receiver/s1', 'Test-node-2/receiver/t0']
@@ -533,21 +551,20 @@ class JTNMTest(GenericTest):
         for index, label in enumerate(sender_labels):
             if index in sender_answer_index:
                 # These should be connectable
-                device_data = self.post_super_resources_and_resource(test, "sender", "test_06con")
+                device_data = self.post_super_resources_and_resource(test, "sender", test_method_name + "con")
             else:
                 # These shouldn't
-                device_data = self.post_super_resources_and_resource(test, "sender", "test_06", nocontrol=True)
+                device_data = self.post_super_resources_and_resource(test, "sender", test_method_name, nocontrol=True)
             device_data['label'] = label
             self.post_resource(test, "sender", device_data, codes=[200])
 
         try:
             # Question 1 connection
-            question = "Connect your controller to the Query API at " + self.registry_location + \
-                       "x-nmos/query/v1.3"
+            question = "Test under construction"
             possible_answers = []
 
-            actual_answer = self.invoke_client_facade("test_06", question, possible_answers, 
-                                                      test_type="action", timeout=180)
+            actual_answer = self.invoke_client_facade(test_method_name, question, possible_answers, 
+                                                      test_type="action")
             
             if actual_answer == 'Next':
                 # TODO make this pass and add extra question to confirm connectable nodes

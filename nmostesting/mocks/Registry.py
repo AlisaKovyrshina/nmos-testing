@@ -61,6 +61,7 @@ class Registry(object):
         self.add_event.clear()
         self.delete_event.clear()
         self.auth_clients = {}
+        self.query_api_called = False
 
     def add(self, headers, payload, version):
         self.last_time = time.time()
@@ -294,6 +295,8 @@ def query(version):
     if authorized is not True:
         abort(authorized)
 
+    registry.query_api_called = True
+
     resources = ['devices', 'flows', 'nodes', 'receivers', 'senders', 'sources', 'subscriptions']
     base_data = []
     for resource in resources:
@@ -311,19 +314,25 @@ def query_resource(version, resource):
     if authorized is not True:
         abort(authorized)
 
+    registry.query_api_called = True
+
     resource_type = resource.rstrip("s")
     base_data = []
+
     try:
-        # Type may not be in the list, so this could throw an exception
-        data = registry.get_resources()[resource_type]
-        for key, value in data.items():
-            base_data.append(value)
+        # Check to see if resource is being requested as a query
+        if request.args.get('id'):
+    
+            resource_id = request.args.get('id')
+            base_data.append(registry.get_resources()[resource_type][resource_id])
+        else:
+            data = registry.get_resources()[resource_type]
+            for key, value in data.items():
+                base_data.append(value)
     except Exception:
         pass
 
     return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))
-
-
 
 @REGISTRY_API.route('/x-nmos/query/<version>/<resource>/<resource_id>', methods=['GET'], strict_slashes=False)
 def get_resource(version, resource, resource_id):
@@ -334,15 +343,17 @@ def get_resource(version, resource, resource_id):
     if authorized is not True:
         abort(authorized)
 
+    registry.query_api_called = True
+
     resource_type = resource.rstrip("s")
-    base_data = []
+    data = []
     try:
         # Type may not be in the list, so this could throw an exception
         data = registry.get_resources()[resource_type][resource_id]
     except Exception:
         pass
 
-    return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))
+    return createCORSResponse(Response(json.dumps(data), mimetype='application/json'))
 
 
 
