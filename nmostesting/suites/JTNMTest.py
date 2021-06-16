@@ -538,42 +538,27 @@ class JTNMTest(GenericTest):
         """
         Identify which Receiver devices are controllable via IS-05
         """
-        test_method_name = inspect.currentframe().f_code.co_name
 
-        # Potential devices to be added to registry
-        sender_labels = ['Test-node-1/sender/a0', 'Test-node-1/sender/a1', 'Test-node-1/sender/b0', 'Test-node-1/sender/b1']
-        # receiver_labels = ['Test-node-2/receiver/s0', 'Test-node-2/receiver/s1', 'Test-node-2/receiver/t0']
-        # Pick up to 3 labels
-        sender_answer_index = self.randomise_answers(len(sender_labels), 3)
-        sender_answer_list = [sender_labels[i] for i in sender_answer_index]
+        return test.DISABLED("Test not yet implemented")
 
-        # Post new resources to registry
-        for index, label in enumerate(sender_labels):
-            if index in sender_answer_index:
-                # These should be connectable
-                device_data = self.post_super_resources_and_resource(test, "sender", test_method_name + "con")
-            else:
-                # These shouldn't
-                device_data = self.post_super_resources_and_resource(test, "sender", test_method_name, nocontrol=True)
-            device_data['label'] = label
-            self.post_resource(test, "sender", device_data, codes=[200])
+    def test_07(self, test):
+        """
+        Instruct Receiver to subscribe to a Sender’s Flow via IS-05
+        """
 
-        try:
-            # Question 1 connection
-            question = "Test under construction"
-            possible_answers = []
+        return test.DISABLED("Test not yet implemented")
 
-            actual_answer = self.invoke_client_facade(test_method_name, question, possible_answers, 
-                                                      test_type="action")
-            
-            if actual_answer == 'Next':
-                # TODO make this pass and add extra question to confirm connectable nodes
-                return test.PASS('Connected')
-            else:
-                # Else probably isn't necessary here as there is no 'incorrect' answer. 
-                # There are no other buttons. If Next button isn't used, test will time out
+    def test_08(self, test):
+        """
+        Disconnecting a Receiver from a connected Flow via IS-05
+        """
 
-                return test.FAIL('Failed to confirm connection')
-            # TODO Figure out how to identify nodes when set up is labelling senders
-        except ClientFacadeException as e:
-            return test.UNCLEAR(e.args[0])
+        return test.DISABLED("Test not yet implemented")
+
+    def test_09(self, test):
+        """
+        Indicating the state of connections via updates received from the IS-04 Query API
+        """
+
+        return test.DISABLED("Test not yet implemented")
+  
