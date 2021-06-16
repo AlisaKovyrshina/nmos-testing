@@ -176,7 +176,7 @@ class JTNMTest(GenericTest):
                 except Exception as e:
                     self.result.append(self.uncaught_exception(test_name, e))
 
-    def invoke_client_facade(self, question, answers, test_type, timeout=None):
+    def _invoke_client_facade(self, question, answers, test_type, timeout=None):
 
         global clientfacade_answer_json
 
@@ -381,7 +381,7 @@ class JTNMTest(GenericTest):
         possible_answers=[]
 
         try:
-            actual_answer = self.invoke_client_facade(question, possible_answers, test_type="action", timeout=600)
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="action", timeout=600)
 
         except ClientFacadeException as e:
             # pre_test_introducton timed out
@@ -395,7 +395,7 @@ class JTNMTest(GenericTest):
         possible_answers=[]
 
         try:
-            actual_answer = self.invoke_client_facade(question, possible_answers, test_type="action", timeout=10)
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="action", timeout=10)
 
         except ClientFacadeException as e:
             # pre_test_introducton timed out
@@ -437,7 +437,7 @@ class JTNMTest(GenericTest):
             'Once you have finished browsing click \'Next\'. Successful browsing of the registration service will be logged by the test framework.\n'
             possible_answers = []
 
-            actual_answer = self.invoke_client_facade(question, possible_answers, test_type="action")
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="action")
 
             # The registry will log calls to the Query API endpoints
             if not self.primary_registry.query_api_called:
@@ -472,7 +472,7 @@ class JTNMTest(GenericTest):
             'Refresh the BCuT\'s view of the registration service and carefully select the senders that are available from the following list.' 
             possible_answers = sender_labels
 
-            actual_answer = self.invoke_client_facade(question, possible_answers, test_type="checkbox")
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="checkbox")
 
             if len(actual_answer) != len(sender_answer_list):
                 return test.FAIL('Incorrect sender identified')
@@ -510,7 +510,7 @@ class JTNMTest(GenericTest):
             'Refresh the BCuT\'s view of the registration service and carefully select the senders that are available from the following list.'
             possible_answers = receiver_labels
 
-            actual_answer = self.invoke_client_facade(question, possible_answers, test_type="checkbox")
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="checkbox")
 
             if len(actual_answer) != len(receiver_answer_list):
                 return test.FAIL('Incorrect receiver identified')
