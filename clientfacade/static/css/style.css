@@ -127,3 +127,8 @@ h1, h2, h3, h4, h5 {
     white-space: pre-line;
     text-align: left;
 }
+
+.list-group-item {
+    text-align: left;
+    margin-left: 20px;
+}
