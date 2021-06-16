@@ -66,6 +66,10 @@ class JTNMTest(GenericTest):
         self.question_timeout = 600 # seconds
         self.test_data = self.load_resource_data()
         self.test_resources = [] # Reference store for new resources created within a test
+        self.sender_labels = [] # Reference for all possible sender labels
+        self.registered_sender_labels = [] # Actual senders registered to mock registry
+        self.receiver_labels = [] # Reference for all possible receiver labels
+        self.registered_receiver_labels = [] # Actual receivers registered to mock registry
 
     def set_up_tests(self):
         self.zc = Zeroconf()
@@ -101,7 +105,14 @@ class JTNMTest(GenericTest):
         if CONFIG.DNS_SD_MODE == "multicast":
             self.zc.register_service(self.registry_mdns[0])
 
+        # Populate mock registry with senders and receivers and store the results
+        MAX_SENDERS = 3
+        MAX_RECEIVERS = 3
+
+        self._populate_registry(MAX_SENDERS, MAX_RECEIVERS)
+
         print('Registry should be available at ' + self.registry_location)
+
 
     def tear_down_tests(self):
         # Clean up mDNS advertisements and disable registries
@@ -124,9 +135,7 @@ class JTNMTest(GenericTest):
     
     def set_up_test(self):
         """Setup performed before EACH test"""
-        self.test_resources.clear()
-        self.primary_registry.reset()
-        self.primary_registry.enable()
+        self.primary_registry.query_api_called = False
 
     def execute_tests(self, test_names):
         """Perform tests defined within this class"""
@@ -248,6 +257,31 @@ class JTNMTest(GenericTest):
                            properties=txt, server=hostname)
         return info
     
+    def _populate_registry(self, max_sender_count, max_receiver_count):
+        """This data is baseline data for all tests in the test suite"""
+        
+        # Potential senders to be added to registry
+        self.sender_labels = ['Test-node-1/sender/gilmour', 'Test-node-1/sender/waters', 'Test-node-1/sender/wright', 'Test-node-1/sender/mason', 'Test-node-1/sender/barrett']
+        # Pick up to MAX_SENDERS to register
+        self.registered_sender_labels = self.randomise_answers(self.sender_labels, max_sender_count)
+        
+        # Post resources to registry
+        for sender in self.registered_sender_labels:
+            device_data = self.post_super_resources_and_resource(self, "sender", "JTNMTest")
+            device_data['label'] = sender
+            self.post_resource(self, "sender", device_data, codes=[200])
+
+        # Potential receivers to be added to registry
+        self.receiver_labels = ['Test-node-2/receiver/palin', 'Test-node-2/receiver/cleese', 'Test-node-2/receiver/jones', 'Test-node-2/receiver/chapman', 'Test-node-2/receiver/idle', 'Test-node-2/receiver/gilliam']
+        # Pick up to MAX_RECEIVERS to register
+        self.registered_receiver_labels = self.randomise_answers(self.receiver_labels, max_receiver_count)
+
+        # Post new resources to registry
+        for receiver in self.registered_receiver_labels:
+            device_data = self.post_super_resources_and_resource(self, "receiver", "JTNMTest")
+            device_data['label'] = receiver
+            self.post_resource(self, "receiver", device_data, codes=[200])
+
     def load_resource_data(self):
         """Loads test data from files"""
         api = self.apis[JTNM_API_KEY]
@@ -355,17 +389,21 @@ class JTNMTest(GenericTest):
 
         return data
 
-    def randomise_answers(self, no_of_answers, max_choices=1):
+    def randomise_answers(self, possible_answers, max_choices=1):
         """
-        no_of_answers: Length of possible_answers list
+        possible_answers: List of possible answers
         max_choices: default 1 for radio answers. No. of list indices to be returned
         max_choices > 1 will return list of random number of list indices up to the value given
         """
+        answer_count = len(possible_answers)
+        answer_indices = []
         if max_choices == 1:
-            return [random.randint(0, no_of_answers-1)]
+            answer_indices = [random.randint(0, answer_count-1)]
         elif max_choices > 1:
             choices = random.randint(1, max_choices)
-            return random.sample(list(range(0, no_of_answers)), k=choices)
+            answer_indices = random.sample(list(range(0, answer_count)), k=choices)
+
+        return [possible_answers[i] for i in answer_indices]
 
     def pre_tests_message(self):
         """
@@ -416,20 +454,7 @@ class JTNMTest(GenericTest):
         """
         Ensure BCuT can access the IS-04 Query API
         """
-        # Devices to be added to registry
-        sender_labels = ['Test-node-1/sender/a1', 'Test-node-1/sender/b0', 'Test-node-1/sender/b1']
-        receiver_labels = ['Test-node-2/receiver/s0', 'Test-node-2/receiver/s1', 'Test-node-2/receiver/t0']
-
-        # Populate the registry with senders and recievers
-        for sender_label in sender_labels:
-            device_data = self.post_super_resources_and_resource(test, "sender", "test_02")
-            device_data['label'] = sender_label
-            self.post_resource(test, "sender", device_data, codes=[200])
-
-        for receiver_label in receiver_labels:
-            device_data = self.post_super_resources_and_resource(test, "receiver", "test_02")
-            device_data['label'] = receiver_label
-            self.post_resource(test, "receiver", device_data, codes=[200])
+        # Mock registry already populated with data, see _populate_registry
             
         try:
             # Question 1 connection
@@ -452,33 +477,21 @@ class JTNMTest(GenericTest):
         """
         Query API should be able to discover all the senders that are registered in the Registry
         """
-        MAX_SENDERS = 3
-
-        # Potential senders to be added to registry
-        sender_labels = ['Test-node-1/sender/gilmour', 'Test-node-1/sender/waters', 'Test-node-1/sender/wright', 'Test-node-1/sender/mason', 'Test-node-1/sender/barrett']
-        # Pick up to MAX_DEVICES labels
-        sender_answer_index = self.randomise_answers(len(sender_labels), MAX_SENDERS)
-        sender_answer_list = [sender_labels[i] for i in sender_answer_index]
-
-        # Post new resources to registry
-        for i in sender_answer_index:
-            device_data = self.post_super_resources_and_resource(test, "sender", "test_03")
-            device_data['label'] = sender_labels[i]
-            self.post_resource(test, "sender", device_data, codes=[200])
+        # Mock registry already populated with data, see _populate_registry
 
         try:
             # Check senders 
             question = 'The Query API should be able to discover all the senders that are registered in the Registry.\n' \
             'Refresh the BCuT\'s view of the registration service and carefully select the senders that are available from the following list.' 
-            possible_answers = sender_labels
+            possible_answers = self.sender_labels
 
             actual_answer = self._invoke_client_facade(question, possible_answers, test_type="checkbox")
 
-            if len(actual_answer) != len(sender_answer_list):
+            if len(actual_answer) != len(self.registered_sender_labels):
                 return test.FAIL('Incorrect sender identified')
             else:
                 for answer in actual_answer:
-                    if answer not in sender_answer_list:
+                    if answer not in self.registered_sender_labels:
                         return test.FAIL('Incorrect sender identified')
 
             return test.PASS('All devices correctly identified')
@@ -490,33 +503,21 @@ class JTNMTest(GenericTest):
         """
         Query API should be able to discover all the receivers that are registered in the Registry
         """
-        MAX_RECEIVERS = 3
-
-        # Potential devices to be added to registry
-        receiver_labels = ['Test-node-2/receiver/palin', 'Test-node-2/receiver/cleese', 'Test-node-2/receiver/jones', 'Test-node-2/receiver/chapman', 'Test-node-2/receiver/idle', 'Test-node-2/receiver/gilliam']
-        # Pick up to MAX_DEVICES labels
-        receiver_answer_index = self.randomise_answers(len(receiver_labels), MAX_RECEIVERS)
-        receiver_answer_list = [receiver_labels[i] for i in receiver_answer_index]  
-
-        # Post new resources to registry
-        for i in receiver_answer_index:
-            device_data = self.post_super_resources_and_resource(test, "receiver", "test_04")
-            device_data['label'] = receiver_labels[i]
-            self.post_resource(test, "receiver", device_data, codes=[200])
+        # Mock registry already populated with data, see _populate_registry
 
         try:
             # Check receivers 
             question = 'The Query API should be able to discover all the receivers that are registered in the Registry.\n' \
             'Refresh the BCuT\'s view of the registration service and carefully select the senders that are available from the following list.'
-            possible_answers = receiver_labels
+            possible_answers = self.receiver_labels
 
             actual_answer = self._invoke_client_facade(question, possible_answers, test_type="checkbox")
 
-            if len(actual_answer) != len(receiver_answer_list):
+            if len(actual_answer) != len(self.registered_receiver_labels):
                 return test.FAIL('Incorrect receiver identified')
             else:
                 for answer in actual_answer:
-                    if answer not in receiver_answer_list:
+                    if answer not in self.registered_receiver_labels:
                         return test.FAIL('Incorrect receiver identified')
 
             return test.PASS('All devices correctly identified')
