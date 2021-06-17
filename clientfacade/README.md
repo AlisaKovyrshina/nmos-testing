@@ -42,5 +42,13 @@ Will need to have endpoint for 'x-nmos/client-testing' to receive questions and 
 
 ## Notes
 
-###NMOS Testing Tool Test Selection
+### NMOS Testing Tool Test Selection
 Note that the "auto" test selection, although present, doesn't do anything presently as there is no RAML associated with the client tests.
+
+### Known Issues
+There are few known issues that can occur if the NMOS Testing Tool, or the Client Facade are unexpectedly stopped/restarted while tests are in progress
+* Restarting the NMOS Testing Tool and re-running the JT-NM Client tests will necessitate a browser refresh of the Client Facade to update the Test Question being displayed
+* If the NMOS Testing Tool is closed in the middle of testing, and the Client Facade is allowed to timeout the current question, the Client Facade will get stuck in a refresh loop
+Other issues
+* With checkbox tests in the Client Facade you currently have to select at least one option before it will move to the next test. Selecting zero options will not allow you to proceed
+* The Mock Registry is currently open to registrations from any NMOS Node. Therefore NMOS Nodes on your network searching for a Registry are likely to register with the Mock Registry.
