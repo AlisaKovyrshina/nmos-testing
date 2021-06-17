@@ -444,13 +444,13 @@ class JTNMTest(GenericTest):
         """
         Introduction to JT-NM Tested Test Suite
         """
-        question =  'This set of tests validates a Broadcast Controller under Test’s (BCuT) ability to query an IS-04 ' \
+        question =  'These tests validate a Broadcast Controller under Test’s (BCuT) ability to query an IS-04 ' \
         'Registry with the IS-04 Query API and to control a Media Node using the IS-05 Connection ' \
-        'Management API.\r\n\r\nA Test AMWA IS-04 v1.2/1.3 reference registration is available on the network, ' \
-        'and advertised in the DNS server via unicast DNS-SD\r\n\r\n' \
-        'Although the test AMWA IS-04 registration service should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
-        'it is also possible to reach the service via the following URL:\r\n\r\n' + self.registry_location + 'x-nmos/query/v1.3\r\n\r\n' \
-        'Once the BCuT has located the test AMWA IS-04 registration service, please click \'Next\''
+        'Management API.\n\nA Test AMWA IS-04 v1.2/1.3 reference Registry is available on the network, ' \
+        'and advertised in the DNS server via unicast DNS-SD\n\n' \
+        'Although the test AMWA IS-04 Registry should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
+        'it is also possible to reach the Registry via the following URL:\n\n' + self.registry_location + 'x-nmos/query/v1.3\n\n' \
+        'Once the BCuT has located the test AMWA IS-04 Registry, please click \'Next\''
         possible_answers=[]
 
         try:
@@ -493,8 +493,8 @@ class JTNMTest(GenericTest):
             
         try:
             # Question 1 connection
-            question = 'Use the BCuT to browse the senders and receivers on the discovered via the selected IS-04 Query API.\n' \
-            'Once you have finished browsing click \'Next\'. Successful browsing of the registration service will be logged by the test framework.\n'
+            question = 'Use the BCuT to browse the Senders and Receivers on the discovered Registry via the selected IS-04 Query API.\n' \
+            'Once you have finished browsing click \'Next\'. Successful browsing of the Registry will be automatically logged by the test framework.\n'
             possible_answers = []
 
             actual_answer = self._invoke_client_facade(question, possible_answers, test_type="action")
@@ -516,8 +516,8 @@ class JTNMTest(GenericTest):
 
         try:
             # Check senders 
-            question = 'The Query API should be able to discover all the senders that are registered in the Registry.\n' \
-            'Refresh the BCuT\'s view of the registration service and carefully select the senders that are available from the following list.' 
+            question = 'The Query API should be able to discover all the Senders that are registered in the Registry.\n' \
+            'Refresh the BCuT\'s view of the Registry and carefully select the Senders that are available from the following list.' 
             possible_answers = self.sender_possible_answers
 
             actual_answers = self._invoke_client_facade(question, possible_answers, test_type="checkbox")
@@ -542,8 +542,8 @@ class JTNMTest(GenericTest):
 
         try:
             # Check receivers 
-            question = 'The Query API should be able to discover all the receivers that are registered in the Registry.\n' \
-            'Refresh the BCuT\'s view of the registration service and carefully select the senders that are available from the following list.'
+            question = 'The Query API should be able to discover all the Receivers that are registered in the Registry.\n' \
+            'Refresh the BCuT\'s view of the Registry and carefully select the Receivers that are available from the following list.'
             possible_answers = self.receiver_possible_answers
 
             actual_answers = self._invoke_client_facade(question, possible_answers, test_type="checkbox")
