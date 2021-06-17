@@ -214,7 +214,7 @@ class JTNMTest(GenericTest):
         if not valid:
             raise ClientFacadeException("Problem contacting Client Façade: " + response)
 
-        # Wait for answer available signal or 120s then move on
+        # Wait for answer available signal or question timeout in seconds
         answer_available.clear()
         get_json = answer_available.wait(timeout=question_timeout)
         
@@ -246,7 +246,6 @@ class JTNMTest(GenericTest):
         else:
             hostname = ip.replace(".", "-") + ".local."
 
-        # TODO: Add another test which checks support for parsing CSV string in api_ver
         txt = {'api_ver': api_ver, 'api_proto': api_proto, 'pri': str(priority), 'api_auth': str(api_auth).lower()}
 
         service_type = "_nmos-register._tcp.local."
@@ -461,7 +460,7 @@ class JTNMTest(GenericTest):
             actual_answer = self._invoke_client_facade(question, possible_answers, test_type="action", timeout=10)
 
         except ClientFacadeException as e:
-            # pre_test_introducton timed out
+            # post_test_introducton timed out
             pass
     
     def test_01(self, test):
