@@ -43,7 +43,7 @@ def retrieve_answer():
     if request.method == 'POST':
         clientfacade_answer_json = request.json
         if 'name' not in clientfacade_answer_json:
-            return 'OK'
+            return 'Invalid JSON received'
         answer_available.set()
 
     return 'OK'
@@ -65,7 +65,6 @@ class JTNMTest(GenericTest):
         self.registry_location = ''
         self.question_timeout = 600 # seconds
         self.test_data = self.load_resource_data()
-        self.test_resources = [] # Reference store for new resources created within a test
         self.sender_possible_answers = [] # Reference for all possible senders
         self.sender_expected_answers = [] # Actual senders registered to mock registry
         self.receiver_possible_answers = [] # Reference for all possible receivers
@@ -91,7 +90,7 @@ class JTNMTest(GenericTest):
             time.sleep(CONFIG.API_PROCESSING_TIMEOUT)
 
         if CONFIG.DNS_SD_MODE == "multicast":
-            priority = 100
+            priority = 0
 
             # Add advertisement for primary registry
             info = self._registry_mdns_info(self.primary_registry.get_data().port, priority)
@@ -149,11 +148,6 @@ class JTNMTest(GenericTest):
     def execute_test(self, test_name):
         """Perform a test defined within this class"""
         self.test_individual = (test_name != "all")
-
-        # Run automatically defined tests
-        if test_name in ["auto", "all"] and not self.disable_auto:
-            print(" * Running basic API tests")
-            self.result += self.basics()
 
         # Run manually defined tests
         if test_name == "all":
@@ -271,8 +265,9 @@ class JTNMTest(GenericTest):
 
         return answer_indices
 
-    # Used to format questions and answers based on device metadata
+    
     def _format_device_metadata(self, label, description, id):
+        """ Used to format answers based on device metadata """
         return label + ' (' + description + ', ' + id + ')'
     
     def _register_resources(self, type, labels, descriptions, resource_ids, max_resource_count):
@@ -351,9 +346,8 @@ class JTNMTest(GenericTest):
 
         valid, r = self.do_request("POST", reg_url + "resource", json={"type": type, "data": data}, headers=headers)
         if not valid:
+            # Hmm - do we need these exceptions as the registry is our own mock registry?
             raise NMOSTestException(fail(test, "Registration API returned an unexpected response: {}".format(r)))
-
-        self.test_resources.append(data)
 
         location = None
         timestamp = None

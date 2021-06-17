@@ -39,3 +39,8 @@ Should be available on 127.0.0.1:5001
 
 ### Fully automated tests:
 Will need to have endpoint for 'x-nmos/client-testing' to receive questions and some method of storing the json. Then add the answer_response and POST back to url_for_response
+
+## Notes
+
+###NMOS Testing Tool Test Selection
+Note that the "auto" test selection, although present, doesn't do anything presently as there is no RAML associated with the client tests.
