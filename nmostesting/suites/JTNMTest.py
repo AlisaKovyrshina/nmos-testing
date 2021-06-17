@@ -180,12 +180,19 @@ class JTNMTest(GenericTest):
                     self.result.append(self.uncaught_exception(test_name, e))
 
     def _invoke_client_facade(self, question, answers, test_type, timeout=None):
-
+        """ 
+        Send question and answers to Client Façade
+        question:   text to be presented to Test User
+        answers:    list of all possible answers
+        test_type:  "radio" - one and only one answer
+                    "checkbox" - multiple answers
+                    "action" - Test User asked to click button, defaults to self.question_timeout
+        timeout:    number of seconds before Client Façade times out test
+        """
         global clientfacade_answer_json
 
         # Get the name of the calling test method to use as an identifier
         test_method_name = inspect.currentframe().f_back.f_code.co_name
-
         method = getattr(self, test_method_name)
 
         question_timeout = timeout if timeout else self.question_timeout
@@ -202,20 +209,20 @@ class JTNMTest(GenericTest):
             "answer_response": "",
             "time_answered": ""
         }
-        # Send questions to jtnm testing API endpoint then wait
+        # Send questions to Client Façade API endpoint then wait
         valid, response = self.do_request("POST", self.apis[JTNM_API_KEY]["url"], json=json_out)
 
         if not valid:
             raise ClientFacadeException("Problem contacting Client Façade: " + response)
 
         # Wait for answer available signal or question timeout in seconds
+        # JSON reponse to question is set in in clientfacade_answer_json global variable (Hmmm)        
         answer_available.clear()
         get_json = answer_available.wait(timeout=question_timeout)
-        
+
         if get_json == False:
             raise ClientFacadeException("Test timed out")
 
-        # JSON reponse to question is set in in clientfacade_answer_json global variable (Hmmm)
         # Basic integrity check for response json
         if clientfacade_answer_json['name'] is None:
             raise ClientFacadeException("Integrity check failed: result format error: " +json.dump(clientfacade_answer_json))
@@ -252,9 +259,9 @@ class JTNMTest(GenericTest):
 
     def _randomise_indices(self, answer_count, max_choices=1):
         """
-        possible_answers: List of possible answers
-        max_choices: default 1 for radio answers. No. of list indices to be returned
-        max_choices > 1 will return list of random number of list indices up to the value given
+        answer_count: number of possible answers
+        max_choices: Maximum number of list indices to be returned. Default 1 for radio button answers. 
+        max_choices > 1 will return list containing a random number of list indices up to the value given
         """
         answer_indices = []
         if max_choices == 1:
@@ -265,37 +272,40 @@ class JTNMTest(GenericTest):
 
         return answer_indices
 
-    
     def _format_device_metadata(self, label, description, id):
         """ Used to format answers based on device metadata """
         return label + ' (' + description + ', ' + id + ')'
     
-    def _register_resources(self, type, labels, descriptions, resource_ids, max_resource_count):
+    def _generate_answers(self, labels, descriptions, resource_ids, indices):
+        """ 
+        labels: list of labels
+        descriptions: list of descriptions
+        resource_ids: list of ids
+        indices: list of the indices of labels/descriptions/resource_ids
         """
-        Register a random selection of resources with registry
-        """
-        # Pick indices of up to max_resource_count resources to register
-        random_indices = self._randomise_indices(len(labels), max_resource_count)
-
-        registered_resources = []
+        answers = []
         
+        for i in indices:
+            answers.append(self._format_device_metadata(labels[i], descriptions[i], resource_ids[i]))
+
+        return answers
+
+    def _register_resources(self, type, labels, descriptions, resource_ids, indices):
+        """
+        type: of the resource e.g. sender, reciever
+        labels: a list of resource labels
+        descriptions: a list of resource descriptions
+        resource_ids: a list of uuids - note that this will be modified by the function
+        indices: list of the indices of the resources to be registered
+        """
         # Post resources to registry
-        for i in random_indices:
+        for i in indices:
             device_data = self.post_super_resources_and_resource(self, type, descriptions[i])
             device_data['label'] = labels[i]
             resource_ids[i] = device_data['id'] # overwrite default UUID with actual one from the Registry
             self.post_resource(self, type, device_data, codes=[200])
-            registered_resources.append(self._format_device_metadata(labels[i], descriptions[i], resource_ids[i]))
 
-        return registered_resources, resource_ids # resource_ids have been modified
-
-    def _generate_answers(self, labels, descriptions, resource_ids):
-        answers = []
-
-        for label, description, resource_id in zip(labels, descriptions, resource_ids):
-            answers.append(self._format_device_metadata(label, description, resource_id))
-
-        return answers
+        return resource_ids # resource_ids have been modified
 
     def _populate_registry(self, max_sender_count, max_receiver_count):
         """This data is baseline data for all tests in the test suite"""
@@ -305,17 +315,24 @@ class JTNMTest(GenericTest):
         sender_descriptions = ['Mock sender 1', 'Mock sender 2', 'Mock sender 3', 'Mock sender 4', 'Mock sender 5']
         sender_ids = [str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())]
         
-        self.sender_expected_answers, sender_ids = self._register_resources("sender", sender_labels, sender_descriptions, sender_ids, max_sender_count)
-        self.sender_possible_answers = self._generate_answers(sender_labels, sender_descriptions, sender_ids)
+        # Pick indices of up to max_sender_count senders to register
+        random_indices = self._randomise_indices(len(sender_labels), max_sender_count)
+        sender_ids = self._register_resources("sender", sender_labels, sender_descriptions, sender_ids, random_indices)
+
+        self.sender_expected_answers = self._generate_answers(sender_labels, sender_descriptions, sender_ids, random_indices);
+        self.sender_possible_answers = self._generate_answers(sender_labels, sender_descriptions, sender_ids, range(len(sender_labels)))
 
         # Pick up to max_sender_count to register
         receiver_labels = ['Test-node-2/receiver/palin', 'Test-node-2/receiver/cleese', 'Test-node-2/receiver/jones', 'Test-node-2/receiver/chapman', 'Test-node-2/receiver/idle', 'Test-node-2/receiver/gilliam']
         receiver_descriptions = ['Mock receiver 1', 'Mock receiver 2', 'Mock receiver 3', 'Mock receiver 4', 'Mock receiver 5', 'Mock receiver 6']
         receiver_ids = [str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())]
 
-        # Pick up to max_receiver_count to register
-        self.receiver_expected_answers, receiver_ids = self._register_resources("receiver", receiver_labels, receiver_descriptions, receiver_ids, max_receiver_count)
-        self.receiver_possible_answers = self._generate_answers(receiver_labels, receiver_descriptions, receiver_ids)
+        # Pick up to max_receiver_count receivers to register
+        random_indices = self._randomise_indices(len(receiver_labels), max_receiver_count)
+        receiver_ids = self._register_resources("receiver", receiver_labels, receiver_descriptions, receiver_ids, random_indices)
+
+        self.receiver_expected_answers = self._generate_answers(receiver_labels, receiver_descriptions, receiver_ids, random_indices)
+        self.receiver_possible_answers = self._generate_answers(receiver_labels, receiver_descriptions, receiver_ids, range(len(receiver_labels)))
 
     def load_resource_data(self):
         """Loads test data from files"""
