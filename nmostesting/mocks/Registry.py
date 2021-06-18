@@ -77,13 +77,6 @@ class Registry(object):
                 self.auth_clients[payload["data"]["id"]] = client_id
                 self.common.resources[payload["type"]][payload["data"]["id"]] = payload["data"]
 
-    # Add resources directly to registry during test setup
-    def add_resource(self, type, id, data):
-        if type not in self.common.resources:
-                self.common.resources[type] = {}
-        
-        self.common.resources[type][id] = data;
-
     def delete(self, headers, payload, version, resource_type, resource_id):
         self.last_time = time.time()
         self.delete_event.set()
