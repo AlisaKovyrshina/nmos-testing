@@ -338,7 +338,7 @@ class JTNMTest(GenericTest):
         """Loads test data from files"""
         api = self.apis[JTNM_API_KEY]
         result_data = dict()
-        resources = ["node", "device", "source", "flow", "sender", "receiver", "device_nocontrol"]
+        resources = ["node", "device", "source", "flow", "sender", "receiver"]
         for resource in resources:
             with open("test_data/JTNM/v1.3_{}.json".format(resource)) as resource_data:
                 resource_json = json.load(resource_data)
@@ -393,33 +393,28 @@ class JTNMTest(GenericTest):
 
         return location, timestamp
 
-    def post_super_resources_and_resource(self, test, type, description, sender_id=None, receiver_id=None, nocontrol=False, fail=Test.FAIL):
+    def post_super_resources_and_resource(self, test, type, description, sender_id=None, receiver_id=None, fail=Test.FAIL):
         """
         Perform POST requests on the Registration API to create the super-resource registrations
         for the requested type, before performing a POST request to create that resource registration
         """
-
         # use the test data as a template for creating new resources
         data = deepcopy(self.test_data[type])
         data["id"] = str(uuid.uuid4())
         data["description"] = description
 
-        device_type = "device_nocontrol" if nocontrol else "device"
-        if type == "device_nocontrol":
-           type = "device"
-
         if type == "node":
             pass
         elif type == "device":
-            node = self.post_super_resources_and_resource(test, "node", description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
+            node = self.post_super_resources_and_resource(test, "node", description, sender_id, receiver_id, fail=Test.UNCLEAR)
             data["node_id"] = node["id"]
             data["senders"] = [ sender_id ] if sender_id else [] 
             data["receivers"] = [ receiver_id ] if receiver_id else [] 
         elif type == "source":
-            device = self.post_super_resources_and_resource(test, device_type, description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
+            device = self.post_super_resources_and_resource(test, "device", description, sender_id, receiver_id, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
         elif type == "flow":
-            source = self.post_super_resources_and_resource(test, "source", description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
+            source = self.post_super_resources_and_resource(test, "source", description, sender_id, receiver_id, fail=Test.UNCLEAR)
             data["device_id"] = source["device_id"]
             data["source_id"] = source["id"]
             # since device_id is v1.1, downgrade
@@ -427,13 +422,13 @@ class JTNMTest(GenericTest):
         elif type == "sender":
             sender_id = str(uuid.uuid4())
             data["id"] = sender_id
-            device = self.post_super_resources_and_resource(test, device_type, description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
+            device = self.post_super_resources_and_resource(test, "device", description, sender_id, receiver_id, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
             data["flow_id"] = str(uuid.uuid4())  # or post a flow first and use its id here?
         elif type == "receiver":
             receiver_id = str(uuid.uuid4())
             data["id"] = receiver_id
-            device = self.post_super_resources_and_resource(test, device_type, description, sender_id, receiver_id, nocontrol, fail=Test.UNCLEAR)
+            device = self.post_super_resources_and_resource(test, "device", description, sender_id, receiver_id, fail=Test.UNCLEAR)
             data["device_id"] = device["id"]
 
         self.post_resource(test, type, data, codes=[201], fail=fail)
