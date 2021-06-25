@@ -208,6 +208,7 @@ class JTNMTest(GenericTest):
         timeout:    number of seconds before Client Façade times out test
         """
         global clientfacade_answer_json
+        answer_available.clear()
 
         # Get the name of the calling test method to use as an identifier
         test_method_name = inspect.currentframe().f_back.f_code.co_name
@@ -234,8 +235,7 @@ class JTNMTest(GenericTest):
             raise ClientFacadeException("Problem contacting Client Façade: " + response)
 
         # Wait for answer available signal or question timeout in seconds
-        # JSON reponse to question is set in in clientfacade_answer_json global variable (Hmmm)        
-        answer_available.clear()
+        # JSON response to question is set in in clientfacade_answer_json global variable (Hmmm)        
         get_json = answer_available.wait(timeout=question_timeout)
 
         if get_json == False:
@@ -332,7 +332,7 @@ class JTNMTest(GenericTest):
         random_indices = self._generate_random_indices(len(sender_labels), min_index_count=1, max_index_count=4)
         sender_ids = self._register_resources("sender", sender_labels, sender_descriptions, sender_ids, random_indices)
 
-        self.sender_expected_answers = self._generate_answers(sender_labels, sender_descriptions, sender_ids, random_indices);
+        self.sender_expected_answers = self._generate_answers(sender_labels, sender_descriptions, sender_ids, random_indices)
         self.sender_possible_answers = self._generate_answers(sender_labels, sender_descriptions, sender_ids, range(len(sender_labels)))
 
         # Pick up to max_sender_count to register
@@ -341,7 +341,7 @@ class JTNMTest(GenericTest):
         receiver_ids = [str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())]
         
         # Pick random receivers to register
-        receiver_indices = self._generate_random_indices(len(receiver_labels), min_index_count=2, max_index_count=5);
+        receiver_indices = self._generate_random_indices(len(receiver_labels), min_index_count=2, max_index_count=5)
 
         # Split receiver_indices into those that have connection api and those that don't
         connectable_receiver_count = random.randint(1, len(receiver_indices) - 1)
@@ -355,7 +355,7 @@ class JTNMTest(GenericTest):
 
         self.receiver_expected_answers = self._generate_answers(receiver_labels, receiver_descriptions, receiver_ids, receiver_indices)
         self.receiver_possible_answers = self._generate_answers(receiver_labels, receiver_descriptions, receiver_ids, range(len(receiver_labels)))
-        self.connectable_receiver_expected_answers = self._generate_answers(receiver_labels, receiver_descriptions, receiver_ids, connectable_receiver_indices);
+        self.connectable_receiver_expected_answers = self._generate_answers(receiver_labels, receiver_descriptions, receiver_ids, connectable_receiver_indices)
 
     def load_resource_data(self):
         """Loads test data from files"""
