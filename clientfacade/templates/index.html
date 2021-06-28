@@ -52,7 +52,9 @@
             // If expired show message
             if (difference < 0) {
                 clearInterval(x);
-                window.location.reload();
+                var button = document.getElementById("submitbtn");
+                button.value = 'Test expired';
+                button.disabled = true;
             }
         }, 1000);
         } 
