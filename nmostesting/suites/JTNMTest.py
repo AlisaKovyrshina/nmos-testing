@@ -587,8 +587,35 @@ class JTNMTest(GenericTest):
         """
         Reference Sender is put offline; Reference Sender is put back online
         """
+        try:
+            # Check senders 
+            question = 'The Query API should be able to discover and dynamically update all the Senders that are registered in the Registry.\n' \
+            'Use the BCuT\'s to browse and take note of the Senders that are available.' 
+            possible_answers = []
 
-        return test.DISABLED("Test not yet implemented")
+            actual_answers = self._invoke_client_facade(question, possible_answers, test_type="action")
+
+            # Take one of the senders offline
+            possible_answers = self.sender_expected_answers
+            offline_sender = random.randint(0, len(possible_answers)-1)
+            offline_sender_id = possible_answers[offline_sender].split(',')[1].strip(' )')
+            offline_sender_data = deepcopy(self.test_data['sender'])
+            offline_sender_data['id'] = offline_sender_id
+
+            del_url = self.mock_registry_base_url + 'x-nmos/registration/v1.3/resource/senders/' + offline_sender_id
+            valid, r = self.do_request("DELETE", del_url)
+
+            # Recheck senders
+            question = "When your BCuT updates, select which sender has gone offline"
+
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="radio")
+
+            if actual_answer != possible_answers[offline_sender]:
+                return test.FAIL('Incorrect sender identified')
+
+            return test.PASS('Sender correctly identified')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
 
     def test_06(self, test):
         """
