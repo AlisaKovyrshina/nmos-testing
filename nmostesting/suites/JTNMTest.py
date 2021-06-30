@@ -329,7 +329,7 @@ class JTNMTest(GenericTest):
         sender_ids = [str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())]
         
         # Pick indices of up to max_sender_count senders to register
-        random_indices = self._generate_random_indices(len(sender_labels), min_index_count=1, max_index_count=4)
+        random_indices = self._generate_random_indices(len(sender_labels), min_index_count=2, max_index_count=4)
         sender_ids = self._register_resources("sender", sender_labels, sender_descriptions, sender_ids, random_indices)
 
         self.sender_expected_answers = self._generate_answers(sender_labels, sender_descriptions, sender_ids, random_indices)
@@ -583,21 +583,21 @@ class JTNMTest(GenericTest):
         except ClientFacadeException as e:
             return test.UNCLEAR(e.args[0])
 
-    def test_05(self, test):
+    def test_05a(self, test):
         """
-        Reference Sender is put offline; Reference Sender is put back online
+        Reference Sender is put offline
         """
         try:
             # Check senders 
             question = 'The Query API should be able to discover and dynamically update all the Senders that are registered in the Registry.\n' \
-            'Use the BCuT\'s to browse and take note of the Senders that are available.' 
+            'Use the BCuT to browse and take note of the Senders that are available.'
             possible_answers = []
 
-            actual_answers = self._invoke_client_facade(question, possible_answers, test_type="action")
+            self._invoke_client_facade(question, possible_answers, test_type="action")
 
             # Take one of the senders offline
-            possible_answers = self.sender_expected_answers
-            offline_sender = random.randint(0, len(possible_answers)-1)
+            possible_answers = self.sender_expected_answers.copy()
+            offline_sender = random.choice(list(range(0, len(self.sender_expected_answers))))
             offline_sender_id = possible_answers[offline_sender].split(',')[1].strip(' )')
             offline_sender_data = deepcopy(self.test_data['sender'])
             offline_sender_data['id'] = offline_sender_id
@@ -605,12 +605,61 @@ class JTNMTest(GenericTest):
             del_url = self.mock_registry_base_url + 'x-nmos/registration/v1.3/resource/senders/' + offline_sender_id
             valid, r = self.do_request("DELETE", del_url)
 
+            # Remove the offline sender from the expected answers for future tests
+            self.sender_expected_answers.remove(possible_answers[offline_sender])
+
             # Recheck senders
             question = "When your BCuT updates, select which sender has gone offline"
 
             actual_answer = self._invoke_client_facade(question, possible_answers, test_type="radio")
 
             if actual_answer != possible_answers[offline_sender]:
+                return test.FAIL('Incorrect sender identified')
+
+            return test.PASS('Sender correctly identified')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
+
+    def test_05b(self, test):
+        """
+        Reference Sender is put online
+        """
+        try:
+            # Check senders
+            question = 'The Query API should be able to discover and dynamically update all the Senders that are registered in the Registry.\n' \
+            'Use the BCuT to browse and take note of the Senders that are available.'
+            possible_answers = []
+
+            self._invoke_client_facade(question, possible_answers, test_type="action")
+
+            # Put an extra sender online
+            # Get list of currently offline senders
+            possible_answers = list(set(self.sender_possible_answers) - set(self.sender_expected_answers))
+            online_sender = random.choice(list(range(0, len(possible_answers))))
+            online_sender_label = possible_answers[online_sender].split(' ')[0].strip("'")
+            online_sender_description = possible_answers[online_sender].split('(')[1].split(',')[0]
+
+            # Post new sender
+            sender_data = self.post_super_resources_and_resource(self, 'sender', online_sender_description)
+            sender_data['label'] = online_sender_label
+            sender_id = sender_data['id']
+            self.post_resource(self, 'sender', sender_data, codes=[200])
+
+            # Update sender lists for rest of tests
+            new_sender_answer = self._format_device_metadata(online_sender_label, online_sender_description, sender_id)
+            self.sender_expected_answers.append(new_sender_answer)
+            self.sender_possible_answers.remove(possible_answers[online_sender])
+            self.sender_possible_answers.append(new_sender_answer)
+
+            # id has changed so need to update possible answers
+            possible_answers[online_sender] = new_sender_answer
+
+            # Recheck senders
+            question = "When your BCuT updates, select which sender has come online"
+
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="radio")
+
+            if actual_answer != new_sender_answer:
                 return test.FAIL('Incorrect sender identified')
 
             return test.PASS('Sender correctly identified')
