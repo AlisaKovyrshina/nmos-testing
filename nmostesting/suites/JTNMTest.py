@@ -197,7 +197,7 @@ class JTNMTest(GenericTest):
                 except Exception as e:
                     self.result.append(self.uncaught_exception(test_name, e))
 
-    def _invoke_client_facade(self, question, answers, test_type, timeout=None):
+    def _invoke_client_facade(self, question, answers, test_type, timeout=None, multipart_test=None):
         """ 
         Send question and answers to Client Façade
         question:   text to be presented to Test User
@@ -206,6 +206,8 @@ class JTNMTest(GenericTest):
                     "checkbox" - multiple answers
                     "action" - Test User asked to click button, defaults to self.question_timeout
         timeout:    number of seconds before Client Façade times out test
+        multipart_test: indicates test uses multiple questions. Default None, should be increasing
+                    integers with each subsequent call within the same test
         """
         global clientfacade_answer_json
         answer_available.clear()
@@ -215,10 +217,11 @@ class JTNMTest(GenericTest):
         method = getattr(self, test_method_name)
 
         question_timeout = timeout if timeout else self.question_timeout
+        test_name = test_method_name if not multipart_test else test_method_name + '_' + str(multipart_test)
 
         json_out = {
             "test_type": test_type,
-            "name": test_method_name,
+            "name": test_name,
             "description": inspect.getdoc(method),
             "question": question,
             "answers": answers,
@@ -611,7 +614,7 @@ class JTNMTest(GenericTest):
             # Recheck senders
             question = "When your BCuT updates, select which sender has gone offline"
 
-            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="radio")
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="radio", multipart_test="1")
 
             if actual_answer != possible_answers[offline_sender]:
                 return test.FAIL('Incorrect sender identified')
@@ -657,7 +660,7 @@ class JTNMTest(GenericTest):
             # Recheck senders
             question = "When your BCuT updates, select which sender has come online"
 
-            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="radio")
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="radio", multipart_test="1")
 
             if actual_answer != new_sender_answer:
                 return test.FAIL('Incorrect sender identified')

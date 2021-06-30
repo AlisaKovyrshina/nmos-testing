@@ -12,6 +12,7 @@ class JTNMAutoTest:
     def __init__(self):
         self.BCuT_url = "http://43.195.121.122/admin/#/" # url of nmos-js instance
         self.mock_registry_url = "http://127.0.0.1:5102/" # url of mock registry from test suite
+        self.multipart_question_storage = {}
         self.driver = webdriver.Firefox() # selenium driver for browser
         # Launch browser, navigate to nmos-js and update query api url to mock registry
         self.driver.get(self.BCuT_url + "Settings")
@@ -38,11 +39,11 @@ class JTNMAutoTest:
         # Once you have finished browsing click 'Next'. Successful browsing of the Registry will be automatically logged by the test framework.
         
         # Browse senders and receivers
-        time.sleep(5)
+        time.sleep(2)
         self.driver.find_element_by_link_text('Senders').click()
-        time.sleep(5)
+        time.sleep(2)
         self.driver.find_element_by_link_text('Receivers').click()
-        time.sleep(5)
+        time.sleep(2)
 
         return "Next"
 
@@ -52,9 +53,9 @@ class JTNMAutoTest:
         """
         # The Query API should be able to discover all the Senders that are registered in the Registry.
         # Refresh the BCuT's view of the Registry and carefully select the Senders that are available from the following list.
-        time.sleep(5)
+        time.sleep(2)
         self.driver.find_element_by_link_text('Senders').click()
-        time.sleep(5)
+        time.sleep(2)
         # Find all senders
         senders = self.driver.find_elements_by_partial_link_text("Test-node-1/sender")
         sender_labels = [sender.text for sender in senders]
@@ -78,9 +79,9 @@ class JTNMAutoTest:
         """
         # The Query API should be able to discover all the Receivers that are registered in the Registry.
         # Refresh the BCuT's view of the Registry and carefully select the Receivers that are available from the following list.
-        time.sleep(5)
+        time.sleep(2)
         self.driver.find_element_by_link_text('Receivers').click()
-        time.sleep(5)
+        time.sleep(2)
         # Find all receivers
         receivers = self.driver.find_elements_by_partial_link_text("Test-node-2/receiver")
         receiver_labels = [receiver.text for receiver in receivers]
@@ -99,15 +100,106 @@ class JTNMAutoTest:
 
     def test_05a(self):
         """
-        Reference Sender is put offline
+        Reference Sender is put offline. First question
         """
-        return "Test not yet implemented"
+        # The Query API should be able to discover and dynamically update all the Senders that are registered in the Registry.
+        # Use the BCuT to browse and take note of the Senders that are available.
+        time.sleep(2)
+        self.driver.find_element_by_link_text('Senders').click()
+        time.sleep(2)
+        # Find all senders
+        senders = self.driver.find_elements_by_partial_link_text("Test-node-1/sender")
+        sender_labels = [sender.text for sender in senders]
+        sender_list = []
+        # loop through senders and gather ids and descriptions
+        for sender in sender_labels:
+            self.driver.find_element_by_link_text(sender).click()
+            time.sleep(2)
+            sender_id = self.driver.find_element_by_xpath("//div[@class='ra-field ra-field-id']/div/div/span").text
+            sender_description = self.driver.find_element_by_xpath("//div[@class='ra-field ra-field-description']/div/div/span").text
+            sender_list.append(self._format_device_metadata(sender, sender_description, sender_id))
+            self.driver.find_element_by_link_text('Senders').click()
+
+        # At this point need to send 'Next' to test suite to get second part of test
+        # When your BCuT updates, select which sender has gone offline
+        self.multipart_question_storage['test_05a'] = sender_list
+
+        return "Next"
+
+    def test_05a_1(self):
+        """
+        Reference sender is put offline. Second question
+        """
+        # When your BCuT updates, select which sender has gone offline
+        time.sleep(2)
+        self.driver.find_element_by_link_text('Senders').click()
+        time.sleep(2)
+        # Find all senders
+        senders = self.driver.find_elements_by_partial_link_text("Test-node-1/sender")
+        sender_labels = [sender.text for sender in senders]
+        sender_list = []
+        # loop through senders and gather ids and descriptions
+        for sender in sender_labels:
+            self.driver.find_element_by_link_text(sender).click()
+            time.sleep(2)
+            sender_id = self.driver.find_element_by_xpath("//div[@class='ra-field ra-field-id']/div/div/span").text
+            sender_description = self.driver.find_element_by_xpath("//div[@class='ra-field ra-field-description']/div/div/span").text
+            sender_list.append(self._format_device_metadata(sender, sender_description, sender_id))
+            self.driver.find_element_by_link_text('Senders').click()
+
+        # Hmm Assuming only a one item difference always. May need to add an if len==1 check and raise an exception if not
+        offline_sender = list(set(self.multipart_question_storage['test_05a']) - set(sender_list))
+        return offline_sender[0]
 
     def test_05b(self):
         """
-        Reference Sender is put online
+        Reference Sender is put online. First question
         """
-        return "Test not yet implemented"
+        time.sleep(2)
+        self.driver.find_element_by_link_text('Senders').click()
+        time.sleep(2)
+        # Find all senders
+        senders = self.driver.find_elements_by_partial_link_text("Test-node-1/sender")
+        sender_labels = [sender.text for sender in senders]
+        sender_list = []
+        # loop through senders and gather ids and descriptions
+        for sender in sender_labels:
+            self.driver.find_element_by_link_text(sender).click()
+            time.sleep(2)
+            sender_id = self.driver.find_element_by_xpath("//div[@class='ra-field ra-field-id']/div/div/span").text
+            sender_description = self.driver.find_element_by_xpath("//div[@class='ra-field ra-field-description']/div/div/span").text
+            sender_list.append(self._format_device_metadata(sender, sender_description, sender_id))
+            self.driver.find_element_by_link_text('Senders').click()
+
+        # At this point need to send 'Next' to test suite to get second part of test
+        # When your BCuT updates, select which sender has come online
+        self.multipart_question_storage['test_05b'] = sender_list
+
+        return "Next"
+
+    def test_05b_1(self):
+        """
+        Reference sender is put online. Second question
+        """
+        # When your BCuT updates, select which sender has come online
+        time.sleep(2)
+        self.driver.find_element_by_link_text('Senders').click()
+        time.sleep(2)
+        # Find all senders
+        senders = self.driver.find_elements_by_partial_link_text("Test-node-1/sender")
+        sender_labels = [sender.text for sender in senders]
+        sender_list = []
+        # loop through senders and gather ids and descriptions
+        for sender in sender_labels:
+            self.driver.find_element_by_link_text(sender).click()
+            time.sleep(2)
+            sender_id = self.driver.find_element_by_xpath("//div[@class='ra-field ra-field-id']/div/div/span").text
+            sender_description = self.driver.find_element_by_xpath("//div[@class='ra-field ra-field-description']/div/div/span").text
+            sender_list.append(self._format_device_metadata(sender, sender_description, sender_id))
+            self.driver.find_element_by_link_text('Senders').click()
+
+        offline_sender = list(set(sender_list) - set(self.multipart_question_storage['test_05b']))
+        return offline_sender[0]
 
     def test_06(self):
         """
@@ -115,9 +207,9 @@ class JTNMAutoTest:
         """
         # Some of the discovered Receivers are controllable via IS-05, for instance, allowing Senders to be connected.
         # Carefully select the Receivers that have connection APIs from the following list.
-        time.sleep(5)
+        time.sleep(2)
         self.driver.find_element_by_link_text('Receivers').click()
-        time.sleep(5)
+        time.sleep(2)
         # Find all receivers
         receivers = self.driver.find_elements_by_partial_link_text("Test-node-2/receiver")
         receiver_labels = [receiver.text for receiver in receivers]
