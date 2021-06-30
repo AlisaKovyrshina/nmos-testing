@@ -97,9 +97,15 @@ class JTNMAutoTest:
 
         return actual_answers
 
-    def test_05(self):
+    def test_05a(self):
         """
-        Reference Sender is put offline; Reference Sender is put back online
+        Reference Sender is put offline
+        """
+        return "Test not yet implemented"
+
+    def test_05b(self):
+        """
+        Reference Sender is put online
         """
         return "Test not yet implemented"
 
