@@ -684,4 +684,4 @@ class JTNMTest(GenericTest):
         """
 
         return test.DISABLED("Test not yet implemented")
-  
+
