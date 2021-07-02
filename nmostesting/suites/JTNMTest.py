@@ -327,8 +327,8 @@ class JTNMTest(GenericTest):
 
         # Generate indices of self.receivers to be registered and some of those to be non connectable
         receiver_indices = self._generate_random_indices(len(self.receivers))
-        non_connectable_receivers = self._generate_random_indices(len(receiver_indices), min_index_count=1, max_index_count=len(receiver_indices)-1)
-        non_connectable_receiver_indices = [r for index, r in enumerate(receiver_indices) if index in non_connectable_receivers]
+        receiver_indices_subset = self._generate_random_indices(len(receiver_indices), min_index_count=1, max_index_count=len(receiver_indices)-1)
+        non_connectable_receiver_indices = [r for index, r in enumerate(receiver_indices) if index in receiver_indices_subset]
 
         # Register randomly chosen resources, with some excluding connection api and generate answer strings
         for i, receiver in enumerate(self.receivers):
