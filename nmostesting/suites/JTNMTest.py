@@ -613,13 +613,16 @@ class JTNMTest(GenericTest):
 
             # Put an extra sender online
             # Get list of currently offline senders
-            possible_answers = [s['answer_str'] for s in self.senders if s['registered'] == False]
             answer_indices = [index for index, s in enumerate(self.senders) if s['registered'] == False]
             online_sender = random.choice(answer_indices)
 
             # Register new sender and update data
             self.senders[online_sender]['id'] = self._register_resource('sender', self.senders[online_sender]['label'], self.senders[online_sender]['description'])
             self.senders[online_sender]['answer_str'] = self._format_device_metadata(self.senders[online_sender]['label'], self.senders[online_sender]['description'], self.senders[online_sender]['id'])
+
+            possible_answers = [s['answer_str'] for s in self.senders if s['registered'] == False]
+
+            # Set sender registered True for future tests
             self.senders[online_sender]['registered'] = True
 
             expected_answer = self.senders[online_sender]['answer_str']
