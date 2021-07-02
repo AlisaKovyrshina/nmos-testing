@@ -325,10 +325,10 @@ class JTNMTest(GenericTest):
                           {'label': 'Test-node-2/receiver/idle', 'description': 'Mock receiver 5', 'id': str(uuid.uuid4()), 'registered': False, 'connectable': True, 'answer_str': ''},
                           {'label': 'Test-node-2/receiver/gilliam', 'description': 'Mock receiver 6', 'id': str(uuid.uuid4()), 'registered': False, 'connectable': True, 'answer_str': ''}]
 
+        # Generate indices of self.receivers to be registered and some of those to be non connectable
         receiver_indices = self._generate_random_indices(len(self.receivers))
-        # Hmmmm receiver_indices is min 2, setting max_index_count as len -1 means all can be connectable (maybe ok). len -2 would mean potentially max 
-        # is sent as 0 with min 1. 
-        non_connectable_receiver_indices = self._generate_random_indices(len(receiver_indices), min_index_count=1, max_index_count=len(receiver_indices)-1)
+        non_connectable_receivers = self._generate_random_indices(len(receiver_indices), min_index_count=1, max_index_count=len(receiver_indices)-1)
+        non_connectable_receiver_indices = [r for index, r in enumerate(receiver_indices) if index in non_connectable_receivers]
 
         # Register randomly chosen resources, with some excluding connection api and generate answer strings
         for i, receiver in enumerate(self.receivers):
