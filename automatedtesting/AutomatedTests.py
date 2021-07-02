@@ -84,12 +84,29 @@ def execute_test():
     Update json and send back to test suite
     """
     test_name = data.getName()
+    test_type = data.getTest()
+    answers = data.getAnswers()
 
     if test_name.startswith("test_"):
         method = getattr(tests, test_name)
         if callable(method):
             print(" * Running " + test_name)
             test_result = method()
+
+            # Verify answer given matches one of those sent
+            if test_type == 'action':
+                pass
+            elif test_type == 'radio':
+                # Should be single answer matching one of the given answers
+                if test_result not in answers:
+                    print("* Invalid answer returned for ", test_name)
+                    test_result = 'invalid answer'
+            elif test_type == 'checkbox':
+                # Verify multiple answers in answers and return list
+                for answer in test_result:
+                    if answer not in answers:
+                        print(" ! Invalid answer returned for ", test_name)
+                        test_result = 'invalid answer'
             data.setAnswer(test_result)
 
     elif test_name == 'pre_tests_message':
