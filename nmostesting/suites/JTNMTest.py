@@ -438,6 +438,7 @@ class JTNMTest(GenericTest):
             flow = self.post_super_resources_and_resource(test, "flow", description, include_connection_api, sender_id, receiver_id, fail=Test.UNCLEAR)
             data["device_id"] = flow["device_id"]
             data["flow_id"] = flow["id"]  # or post a flow first and use its id here?
+            data["manifest_href"] = self.mock_node_base_url + "/video.sdp"
         elif type == "receiver":
             receiver_id = str(uuid.uuid4())
             data["id"] = receiver_id
