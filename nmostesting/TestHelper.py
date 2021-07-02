@@ -14,9 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
 import threading
 import requests
 import websocket
+import websockets
 import os
 import jsonref
 import netifaces
@@ -390,3 +392,50 @@ class MQTTClientWorker:
             self.error_occurred = True
             self.error_message = buf
         print("MQTT log: {}: {}".format(level, buf))
+
+class SubscriptionWebsocketWorker(threading.Thread):
+    """Websocket Server Worker Thread"""
+
+    async def producer_handler(self, websocket, path):
+
+        self.loop.call_soon_threadsafe(self.send_sync_data_grain_callback, self.resource_type)
+
+        while True:
+            message = await self.message_queue.get()
+            await websocket.send(message)
+
+    def __init__(self, host, port, resource_type):
+        """
+        Initializer
+        :param resource_type: type of resource to which we are subscribing
+        :param host: host ip for websocket server (string)
+        :param port: port for websocket server (int)
+        """
+        threading.Thread.__init__(self, daemon=True)
+
+        self.host = host
+        self.port = port
+        self.resource_type = resource_type
+
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.message_queue = asyncio.Queue()
+        # Hmm strictly we should 'await' the websocket. However we would have to make the __init__ async which causes problems
+        # might there be a way of soing this using one of the event loop support function?
+        self.ws_serve = websockets.serve(self.producer_handler, self.host, self.port)
+                
+    def run(self):
+        self.loop.run_until_complete(self.ws_serve)
+        self.loop.run_forever()
+
+    def send_message(self, message):
+        self.loop.call_soon_threadsafe(self.message_queue.put_nowait, message)
+        
+    def close(self):
+        # Hmm currently the workers are left running
+        # as we don't have a usable webserver handle to close
+        pass
+    
+    def set_send_sync_data_grain_callback(self, callback):
+        """callback with 1 parameters: resource_type (string) """
+        self.send_sync_data_grain_callback = callback

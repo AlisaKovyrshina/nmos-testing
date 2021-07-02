@@ -16,12 +16,15 @@ import time
 import flask
 import json
 import re
+import threading
+import uuid
 
 from flask import request, jsonify, abort, Blueprint, Response
 from threading import Event
-from ..Config import PORT_BASE, AUTH_TOKEN_PUBKEY, ENABLE_AUTH, AUTH_TOKEN_ISSUER
+from ..Config import PORT_BASE, AUTH_TOKEN_PUBKEY, ENABLE_AUTH, AUTH_TOKEN_ISSUER, WEBSOCKET_PORT_BASE
 from authlib.jose import jwt
-
+from ..NMOSUtils import NMOSUtils
+from ..TestHelper import SubscriptionWebsocketWorker, get_default_ip
 
 class RegistryCommon(object):
     def __init__(self):
@@ -30,7 +33,6 @@ class RegistryCommon(object):
     def reset(self):
         self.resources = {"node": {}}
 
-
 class RegistryData(object):
     def __init__(self, port):
         self.port = port
@@ -38,10 +40,11 @@ class RegistryData(object):
         self.deletes = []
         self.heartbeats = []
 
+class SubscriptionException(Exception):
+    pass
 
 class BCP00302Exception(Exception):
     pass
-
 
 class Registry(object):
     def __init__(self, data_store, port_increment):
@@ -50,6 +53,8 @@ class Registry(object):
         self.add_event = Event()
         self.delete_event = Event()
         self.reset()
+        self.subscriptions = {}
+        self.query_api_id = str(uuid.uuid4()) # Query API Id for subscritions. Hmm is this not defined somewhere already?
 
     def reset(self):
         self.last_time = time.time()
@@ -75,7 +80,13 @@ class Registry(object):
                 if payload["data"]["id"] in self.auth_clients and self.auth_clients[payload["data"]["id"]] != client_id:
                     raise BCP00302Exception
                 self.auth_clients[payload["data"]["id"]] = client_id
+
+                # Is this is an existing resource that's being updated - will be None if doesn't already exist
+                existing_resource = self.common.resources[payload["type"]].get(payload["data"]["id"])
+
                 self.common.resources[payload["type"]][payload["data"]["id"]] = payload["data"]
+
+                self._send_data_grain(payload["type"], payload["data"]["id"], existing_resource, payload["data"] )
 
     def delete(self, headers, payload, version, resource_type, resource_id):
         self.last_time = time.time()
@@ -86,6 +97,7 @@ class Registry(object):
             client_id = self._get_client_id(headers)
             if resource_id in self.auth_clients and self.auth_clients[resource_id] != client_id:
                 raise BCP00302Exception
+            self._send_data_grain(resource_type, resource_id, self.common.resources[resource_type][resource_id], None )
             self.common.resources[resource_type].pop(resource_id, None)
 
     def heartbeat(self, headers, payload, version, node_id):
@@ -168,6 +180,92 @@ class Registry(object):
                 # TODO: Add debug which can be returned in the error response JSON
                 return 400
         return True
+
+    # Query API subscription support methods
+
+    def subscribe_to_query_api(self, version, resource_path):
+        """creates a subscription and starts a Subscription WebSocket"""
+
+        resource_type = self._get_resource_type(resource_path)
+
+        resource_types = ['node', 'device', 'source', 'flow', 'sender', 'receiver']
+
+        if resource_type not in resource_types:
+            raise SubscriptionException("Unknown resource type:" + resource_type + " from resource path:" + resource_path)
+
+        # return existing subscription for this resource type if it already exists
+        if resource_type in self.subscriptions:
+            return self.subscriptions[resource_type], False
+
+        websocket_port = WEBSOCKET_PORT_BASE + resource_types.index(resource_type)
+        websocket_server = SubscriptionWebsocketWorker('0.0.0.0', websocket_port, resource_type)
+        
+        subscription_id = str(uuid.uuid4())
+        subscription = { 'id': subscription_id,
+            'resource_path': resource_path,
+            'websocket': websocket_server,
+            'query_api_id': self.query_api_id,
+            'ws_href': 'ws://' + get_default_ip() + ':' + str(websocket_port) +'/x-nmos/query/' + version + '/subscriptions/' + subscription_id }
+        self.subscriptions[resource_type] = subscription
+
+        websocket_server.set_send_sync_data_grain_callback(self.send_sync_data_grain)
+        websocket_server.start()
+
+        return subscription, True
+
+    def _get_resource_type(self, resource_path):
+        """ Extract Resource Type from Resource Path """
+        remove_query = resource_path.split('?')[0] # remove query parameters
+        remove_slashes = remove_query.strip('/') # strip leading and trailing slashes
+        return remove_slashes.rstrip('s') # remove training 's'
+
+    def send_sync_data_grain(self, resource_type):
+        """ creates a sync data grain for the specified resource type - this is called back by the Subscripion WebSocket when a client connects"""
+        if resource_type in self.subscriptions:
+            subscription = self.subscriptions[resource_type]
+
+            print("creating data grain for " + resource_type)
+            data_grain = self._bootstrap_data_grain(subscription['query_api_id'], subscription["id"], resource_type)
+
+            resource_data = self.get_resources()[resource_type]
+
+            for path, resource in resource_data.items():
+                data = { 'path': path, 'pre': resource, 'post': resource }
+                data_grain["grain"]["data"].append(data)
+
+            subscription['websocket'].send_message(json.dumps(data_grain))
+    
+    def _send_data_grain(self, resource_type, resource_id, pre_resource, post_resource):
+        """ creates a data grain and sends to the WebSocket worker """
+        if resource_type in self.subscriptions:
+            subscription = self.subscriptions[resource_type]
+
+            # create data grain
+            data_grain = self._bootstrap_data_grain(subscription['query_api_id'], subscription['id'], resource_type)
+
+            data = { 'path': resource_id }
+            if pre_resource:
+                data['pre'] = pre_resource
+            if post_resource:
+                data['post'] = post_resource
+
+            data_grain["grain"]["data"].append(data)
+
+            subscription['websocket'].send_message(json.dumps(data_grain))
+
+    def _bootstrap_data_grain(self, query_api_id, subscription_id, resource_type):
+        """ Create a data grain with all the fields filled out expect for the [grain][data] """
+        timestamp = NMOSUtils.get_TAI_time();
+
+        return { 'grain_type': 'event', 
+            'source_id': query_api_id,
+            'flow_id': subscription_id,
+            'origin_timestamp': timestamp,
+            'sync_timestamp': timestamp,
+            'creation_timestamp': timestamp,
+            'rate': {'denominator': 1, 'numerator': 0 },
+            'duration': {'denominator': 1, 'numerator': 0 },
+            'grain': {  'type': 'urn:x-nmos:format:data.event', 'topic': '/' + resource_type + 's/', 'data': [] } }
 
 
 # 0 = Invalid request testing registry
@@ -348,9 +446,40 @@ def get_resource(version, resource, resource_id):
 
     return createCORSResponse(Response(json.dumps(data), mimetype='application/json'))
 
+@REGISTRY_API.route('/x-nmos/query/<version>/subscriptions', methods=["POST"])
+def post_subscription(version):
+    
+    registry = REGISTRIES[flask.current_app.config["REGISTRY_INSTANCE"]]
+    if not registry.enabled:
+        abort(503)
+    authorized = registry.check_authorized(request.headers, request.path)
+    if authorized is not True:
+        abort(authorized)
 
+    subscription_request = request.json
 
-@REGISTRY_API.route('/', methods=["GET"], strict_slashes=False)
+    subscription_response = {}
+    created = False
+    
+    try:
+        subscription, created = registry.subscribe_to_query_api(version, subscription_request["resource_path"])
+
+        subscription_response = {'id': subscription["id"],
+            'max_update_rate_ms': subscription_request['max_update_rate_ms'],
+            'params': subscription_request['params'],
+            'persist': subscription_request['persist'],
+            'resource_path': subscription['resource_path'],
+            'secure': subscription_request['secure'],
+            'ws_href': subscription['ws_href'] }
+    except SubscriptionException as e:
+        print('Subscription failed: ' + e.args[0])
+
+    if created:
+        return jsonify(subscription_response), 201 
+    else:
+        return jsonify(subscription_response), 200 
+
+@REGISTRY_API.route('/', methods=["GET"], strict_slashes=False)    
 def base():
     base_data = ["I'm a mock registry"]
     return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))

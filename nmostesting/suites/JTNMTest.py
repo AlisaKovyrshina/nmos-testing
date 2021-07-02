@@ -505,8 +505,9 @@ class JTNMTest(GenericTest):
 
             actual_answer = self._invoke_client_facade(question, possible_answers, test_type="action")
 
+            # Fail if the REST Query API was not called, and no query subscriptions were made
             # The registry will log calls to the Query API endpoints
-            if not self.primary_registry.query_api_called:
+            if not self.primary_registry.query_api_called and len(self.primary_registry.subscriptions) == 0:
                 return test.FAIL('IS-04 Query API not reached')
             
             return test.PASS('IS-04 Query API reached successfully')
