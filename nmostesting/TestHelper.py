@@ -402,15 +402,21 @@ class SubscriptionWebsocketWorker(threading.Thread):
             pass
 
     async def producer_handler(self, websocket, path):
+        
+        # handle multiple client connections per socket
+        self._connected_clients.add(websocket)
+
         # when websocket client first connects we immediatley queue a 'sync' data grain message to be sent
         self._loop.call_soon_threadsafe(self.queue_sync_data_grain_callback, self._resource_type)
         
         # will automatically exit loop when websocket client disconnects
         while True:
             message = await self._message_queue.get()
-            await websocket.send(message)
+            # broadcast to all connected clients
+            await asyncio.wait([ws.send(message) for ws in self._connected_clients])
 
     async def handler(self, websocket, path):
+        
         consumer_task = asyncio.ensure_future(
             self.consumer_handler(websocket, path))
         producer_task = asyncio.ensure_future(
@@ -437,6 +443,7 @@ class SubscriptionWebsocketWorker(threading.Thread):
         asyncio.set_event_loop(self._loop)
 
         self._message_queue = asyncio.Queue()
+        self._connected_clients = set()
 
         self._ws_server = self._loop.run_until_complete(websockets.serve(self.handler, host, port))
                 
