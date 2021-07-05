@@ -86,7 +86,7 @@ class Registry(object):
 
                 self.common.resources[payload["type"]][payload["data"]["id"]] = payload["data"]
 
-                self._queue_sync_data_grain(payload["type"], payload["data"]["id"], existing_resource, payload["data"] )
+                self._queue_data_grain(payload["type"], payload["data"]["id"], existing_resource, payload["data"] )
 
     def delete(self, headers, payload, version, resource_type, resource_id):
         self.last_time = time.time()
@@ -97,7 +97,7 @@ class Registry(object):
             client_id = self._get_client_id(headers)
             if resource_id in self.auth_clients and self.auth_clients[resource_id] != client_id:
                 raise BCP00302Exception
-            self._queue_sync_data_grain(resource_type, resource_id, self.common.resources[resource_type][resource_id], None )
+            self._queue_data_grain(resource_type, resource_id, self.common.resources[resource_type][resource_id], None )
             self.common.resources[resource_type].pop(resource_id, None)
 
     def heartbeat(self, headers, payload, version, node_id):
@@ -221,7 +221,7 @@ class Registry(object):
         return remove_slashes.rstrip('s') # remove training 's'
 
     def queue_sync_data_grain(self, resource_type):
-        """ creates a sync data grain for the specified resource type - this is called back by the Subscripion WebSocket when a client connects"""
+        """ creates a sync data grain for the specified resource type """
         try:
             subscription = self.subscriptions[resource_type]
 
@@ -238,7 +238,7 @@ class Registry(object):
         except KeyError as err:
             print('No subscription for resource type: {0}'.format(err) )
     
-    def _queue_sync_data_grain(self, resource_type, resource_id, pre_resource, post_resource):
+    def _queue_data_grain(self, resource_type, resource_id, pre_resource, post_resource):
         """ creates a data grain and sends to the WebSocket worker """
         try:
             subscription = self.subscriptions[resource_type]
