@@ -86,7 +86,7 @@ class Registry(object):
 
                 self.common.resources[payload["type"]][payload["data"]["id"]] = payload["data"]
 
-                self._send_data_grain(payload["type"], payload["data"]["id"], existing_resource, payload["data"] )
+                self._queue_sync_data_grain(payload["type"], payload["data"]["id"], existing_resource, payload["data"] )
 
     def delete(self, headers, payload, version, resource_type, resource_id):
         self.last_time = time.time()
@@ -97,7 +97,7 @@ class Registry(object):
             client_id = self._get_client_id(headers)
             if resource_id in self.auth_clients and self.auth_clients[resource_id] != client_id:
                 raise BCP00302Exception
-            self._send_data_grain(resource_type, resource_id, self.common.resources[resource_type][resource_id], None )
+            self._queue_sync_data_grain(resource_type, resource_id, self.common.resources[resource_type][resource_id], None )
             self.common.resources[resource_type].pop(resource_id, None)
 
     def heartbeat(self, headers, payload, version, node_id):
@@ -121,6 +121,7 @@ class Registry(object):
     def disable(self):
         self.test_first_reg = False
         self.enabled = False
+        self._close_subscription_websockets()
 
     def wait_for_registration(self, timeout):
         self.add_event.wait(timeout)
@@ -208,7 +209,7 @@ class Registry(object):
             'ws_href': 'ws://' + get_default_ip() + ':' + str(websocket_port) +'/x-nmos/query/' + version + '/subscriptions/' + subscription_id }
         self.subscriptions[resource_type] = subscription
 
-        websocket_server.set_send_sync_data_grain_callback(self.send_sync_data_grain)
+        websocket_server.set_queue_sync_data_grain_callback(self.queue_sync_data_grain)
         websocket_server.start()
 
         return subscription, True
@@ -219,9 +220,9 @@ class Registry(object):
         remove_slashes = remove_query.strip('/') # strip leading and trailing slashes
         return remove_slashes.rstrip('s') # remove training 's'
 
-    def send_sync_data_grain(self, resource_type):
+    def queue_sync_data_grain(self, resource_type):
         """ creates a sync data grain for the specified resource type - this is called back by the Subscripion WebSocket when a client connects"""
-        if resource_type in self.subscriptions:
+        try:
             subscription = self.subscriptions[resource_type]
 
             print("creating data grain for " + resource_type)
@@ -233,11 +234,13 @@ class Registry(object):
                 data = { 'path': path, 'pre': resource, 'post': resource }
                 data_grain["grain"]["data"].append(data)
 
-            subscription['websocket'].send_message(json.dumps(data_grain))
+            subscription['websocket'].queue_message(json.dumps(data_grain))
+        except KeyError as err:
+            print('No subscription for resource type: {0}'.format(err) )
     
-    def _send_data_grain(self, resource_type, resource_id, pre_resource, post_resource):
+    def _queue_sync_data_grain(self, resource_type, resource_id, pre_resource, post_resource):
         """ creates a data grain and sends to the WebSocket worker """
-        if resource_type in self.subscriptions:
+        try:
             subscription = self.subscriptions[resource_type]
 
             # create data grain
@@ -251,7 +254,9 @@ class Registry(object):
 
             data_grain["grain"]["data"].append(data)
 
-            subscription['websocket'].send_message(json.dumps(data_grain))
+            subscription['websocket'].queue_message(json.dumps(data_grain))
+        except KeyError as err:
+            print('No subscription for resource type: {0}'.format(err) )
 
     def _bootstrap_data_grain(self, query_api_id, subscription_id, resource_type):
         """ Create a data grain with all the fields filled out expect for the [grain][data] """
@@ -267,6 +272,13 @@ class Registry(object):
             'duration': {'denominator': 1, 'numerator': 0 },
             'grain': {  'type': 'urn:x-nmos:format:data.event', 'topic': '/' + resource_type + 's/', 'data': [] } }
 
+    def _close_subscription_websockets(self):
+
+        print('Closing registry subscription websockets')
+        for subscription in self.subscriptions.values():
+            subscription['websocket'].close()
+
+        self.subscriptions = {}
 
 # 0 = Invalid request testing registry
 # 1 = Primary testing registry

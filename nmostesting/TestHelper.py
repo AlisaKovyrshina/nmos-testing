@@ -396,13 +396,31 @@ class MQTTClientWorker:
 class SubscriptionWebsocketWorker(threading.Thread):
     """Websocket Server Worker Thread"""
 
+    async def consumer_handler(self, websocket, path):
+        async for message in websocket:
+            #ignore incoming websocket messages
+            pass
+
     async def producer_handler(self, websocket, path):
-
-        self.loop.call_soon_threadsafe(self.send_sync_data_grain_callback, self.resource_type)
-
+        # when websocket client first connects we immediatley queue a 'sync' data grain message to be sent
+        self._loop.call_soon_threadsafe(self.queue_sync_data_grain_callback, self._resource_type)
+        
+        # will automatically exit loop when websocket client disconnects
         while True:
-            message = await self.message_queue.get()
+            message = await self._message_queue.get()
             await websocket.send(message)
+
+    async def handler(self, websocket, path):
+        consumer_task = asyncio.ensure_future(
+            self.consumer_handler(websocket, path))
+        producer_task = asyncio.ensure_future(
+            self.producer_handler(websocket, path))
+        done, pending = await asyncio.wait(
+            [consumer_task, producer_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
 
     def __init__(self, host, port, resource_type):
         """
@@ -413,29 +431,25 @@ class SubscriptionWebsocketWorker(threading.Thread):
         """
         threading.Thread.__init__(self, daemon=True)
 
-        self.host = host
-        self.port = port
-        self.resource_type = resource_type
+        self._resource_type = resource_type
 
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.message_queue = asyncio.Queue()
-        # Hmm strictly we should 'await' the websocket. However we would have to make the __init__ async which causes problems
-        # might there be a way of soing this using one of the event loop support function?
-        self.ws_serve = websockets.serve(self.producer_handler, self.host, self.port)
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+
+        self._message_queue = asyncio.Queue()
+
+        self._ws_server = self._loop.run_until_complete(websockets.serve(self.handler, host, port))
                 
     def run(self):
-        self.loop.run_until_complete(self.ws_serve)
-        self.loop.run_forever()
+        self._loop.run_forever()
 
-    def send_message(self, message):
-        self.loop.call_soon_threadsafe(self.message_queue.put_nowait, message)
+    def queue_message(self, message):
+        self._loop.call_soon_threadsafe(self._message_queue.put_nowait, message)
         
     def close(self):
-        # Hmm currently the workers are left running
-        # as we don't have a usable webserver handle to close
-        pass
+        print('Closing websocket for ' + self._resource_type)
+        self._ws_server.close()
     
-    def set_send_sync_data_grain_callback(self, callback):
-        """callback with 1 parameters: resource_type (string) """
-        self.send_sync_data_grain_callback = callback
+    def set_queue_sync_data_grain_callback(self, callback):
+        """callback to queue sync data grain message with 1 parameter: resource_type (string) """
+        self.queue_sync_data_grain_callback = callback
