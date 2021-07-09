@@ -86,7 +86,7 @@ class Registry(object):
 
                 self.common.resources[payload["type"]][payload["data"]["id"]] = payload["data"]
 
-                self._queue_data_grain(payload["type"], payload["data"]["id"], existing_resource, payload["data"] )
+                self._queue_single_data_grain(payload["type"], payload["data"]["id"], existing_resource, payload["data"] )
 
     def delete(self, headers, payload, version, resource_type, resource_id):
         self.last_time = time.time()
@@ -97,7 +97,7 @@ class Registry(object):
             client_id = self._get_client_id(headers)
             if resource_id in self.auth_clients and self.auth_clients[resource_id] != client_id:
                 raise BCP00302Exception
-            self._queue_data_grain(resource_type, resource_id, self.common.resources[resource_type][resource_id], None )
+            self._queue_single_data_grain(resource_type, resource_id, self.common.resources[resource_type][resource_id], None )
             self.common.resources[resource_type].pop(resource_id, None)
 
     def heartbeat(self, headers, payload, version, node_id):
@@ -196,10 +196,12 @@ class Registry(object):
 
         # return existing subscription for this resource type if it already exists
         if resource_type in self.subscriptions:
-            return self.subscriptions[resource_type], False
+            return self.subscriptions[resource_type], False # subscription_created=False
 
         websocket_port = WEBSOCKET_PORT_BASE + resource_types.index(resource_type)
         websocket_server = SubscriptionWebsocketWorker('0.0.0.0', websocket_port, resource_type)
+        websocket_server.set_queue_sync_data_grain_callback(self.queue_sync_data_grain)
+        websocket_server.start()
         
         subscription_id = str(uuid.uuid4())
         subscription = { 'id': subscription_id,
@@ -209,70 +211,59 @@ class Registry(object):
             'ws_href': 'ws://' + get_default_ip() + ':' + str(websocket_port) +'/x-nmos/query/' + version + '/subscriptions/' + subscription_id }
         self.subscriptions[resource_type] = subscription
 
-        websocket_server.set_queue_sync_data_grain_callback(self.queue_sync_data_grain)
-        websocket_server.start()
-
-        return subscription, True
+        return subscription, True # subscription_created=True
 
     def _get_resource_type(self, resource_path):
         """ Extract Resource Type from Resource Path """
         remove_query = resource_path.split('?')[0] # remove query parameters
         remove_slashes = remove_query.strip('/') # strip leading and trailing slashes
-        return remove_slashes.rstrip('s') # remove training 's'
+        return remove_slashes.rstrip('s') # remove trailing 's'
 
     def queue_sync_data_grain(self, resource_type):
-        """ creates a sync data grain for the specified resource type """
+        """ queues sync data grain to be sent by subscription websocket for resource_type"""
+        
+        resource_data = self.get_resources()[resource_type]
+
+        self._create_and_queue_data_grains(resource_type, resource_data.keys(), resource_data, resource_data)
+
+    def _queue_single_data_grain(self, resource_type, resource_id, pre_resource, post_resource):
+        """ queues data grain to be sent by subscription websocket for resource_type """
+        
+        self._create_and_queue_data_grains(resource_type, [resource_id], {resource_id: pre_resource}, {resource_id: post_resource})
+
+    def _create_and_queue_data_grains(self, resource_type, resource_ids, pre_resources, post_resources):
+        """ creates a data grain and queues on subscription websocket for resource_type"""
+
         try:
             subscription = self.subscriptions[resource_type]
 
-            print("creating data grain for " + resource_type)
-            data_grain = self._bootstrap_data_grain(subscription['query_api_id'], subscription["id"], resource_type)
+            timestamp = NMOSUtils.get_TAI_time();
 
-            resource_data = self.get_resources()[resource_type]
+            data_grain =  { 'grain_type': 'event', 
+                'source_id': subscription['query_api_id'],
+                'flow_id': subscription["id"],
+                'origin_timestamp': timestamp,
+                'sync_timestamp': timestamp,
+                'creation_timestamp': timestamp,
+                'rate': {'denominator': 1, 'numerator': 0 },
+                'duration': {'denominator': 1, 'numerator': 0 },
+                'grain': {  'type': 'urn:x-nmos:format:data.event', 'topic': '/' + resource_type + 's/', 'data': [] } }
 
-            for path, resource in resource_data.items():
-                data = { 'path': path, 'pre': resource, 'post': resource }
+            for resource_id in resource_ids:
+                data = { 'path': resource_id }
+                if pre_resources.get(resource_id):
+                    data['pre'] = pre_resources[resource_id]
+                if post_resources.get(resource_id):
+                    data['post'] = post_resources[resource_id]
                 data_grain["grain"]["data"].append(data)
 
             subscription['websocket'].queue_message(json.dumps(data_grain))
+
         except KeyError as err:
             print('No subscription for resource type: {0}'.format(err) )
-    
-    def _queue_data_grain(self, resource_type, resource_id, pre_resource, post_resource):
-        """ creates a data grain and sends to the WebSocket worker """
-        try:
-            subscription = self.subscriptions[resource_type]
-
-            # create data grain
-            data_grain = self._bootstrap_data_grain(subscription['query_api_id'], subscription['id'], resource_type)
-
-            data = { 'path': resource_id }
-            if pre_resource:
-                data['pre'] = pre_resource
-            if post_resource:
-                data['post'] = post_resource
-
-            data_grain["grain"]["data"].append(data)
-
-            subscription['websocket'].queue_message(json.dumps(data_grain))
-        except KeyError as err:
-            print('No subscription for resource type: {0}'.format(err) )
-
-    def _bootstrap_data_grain(self, query_api_id, subscription_id, resource_type):
-        """ Create a data grain with all the fields filled out expect for the [grain][data] """
-        timestamp = NMOSUtils.get_TAI_time();
-
-        return { 'grain_type': 'event', 
-            'source_id': query_api_id,
-            'flow_id': subscription_id,
-            'origin_timestamp': timestamp,
-            'sync_timestamp': timestamp,
-            'creation_timestamp': timestamp,
-            'rate': {'denominator': 1, 'numerator': 0 },
-            'duration': {'denominator': 1, 'numerator': 0 },
-            'grain': {  'type': 'urn:x-nmos:format:data.event', 'topic': '/' + resource_type + 's/', 'data': [] } }
 
     def _close_subscription_websockets(self):
+        """ closing websockets will automatically disconnect clients and stop websockets """
 
         print('Closing registry subscription websockets')
         for subscription in self.subscriptions.values():

@@ -394,7 +394,7 @@ class MQTTClientWorker:
         print("MQTT log: {}: {}".format(level, buf))
 
 class SubscriptionWebsocketWorker(threading.Thread):
-    """Websocket Server Worker Thread"""
+    """Subscription Server Worker Thread"""
 
     async def consumer_handler(self, websocket, path):
         async for message in websocket:
@@ -409,7 +409,7 @@ class SubscriptionWebsocketWorker(threading.Thread):
         # when websocket client first connects we immediatley queue a 'sync' data grain message to be sent
         self._loop.call_soon_threadsafe(self.queue_sync_data_grain_callback, self._resource_type)
         
-        # will automatically exit loop when websocket client disconnects
+        # will automatically exit loop when websocket client disconnects or server closed
         while True:
             message = await self._message_queue.get()
             # broadcast to all connected clients
@@ -417,14 +417,11 @@ class SubscriptionWebsocketWorker(threading.Thread):
 
     async def handler(self, websocket, path):
         
-        consumer_task = asyncio.ensure_future(
-            self.consumer_handler(websocket, path))
-        producer_task = asyncio.ensure_future(
-            self.producer_handler(websocket, path))
-        done, pending = await asyncio.wait(
-            [consumer_task, producer_task],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
+        consumer_task = asyncio.ensure_future(self.consumer_handler(websocket, path))
+        producer_task = asyncio.ensure_future(self.producer_handler(websocket, path))
+
+        done, pending = await asyncio.wait([consumer_task, producer_task], return_when=asyncio.FIRST_COMPLETED, )
+        
         for task in pending:
             task.cancel()
 
