@@ -94,19 +94,14 @@ def resources(version, resource):
     resource_ids = ["This should be a list of linked sender/receiver ids"]
     base_data = []
     for id in resource_ids:
-        base_data.append(url_for('.connection', version=version, resource=resource, resource_id=id))
+        base_data.append(str(id)+ '/')
 
     return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
 
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>', methods=["GET"], strict_slashes=False)
 def connection(version, resource, resource_id):
-    base_data = [url_for(".constraints", version=version, resource=resource, resource_id=resource_id),
-                 url_for(".staged", version=version, resource=resource, resource_id=resource_id),
-                 url_for(".active", version=version, resource=resource, resource_id=resource_id),
-                 url_for(".transport_file", version=version, resource=resource, resource_id=resource_id),
-                 url_for(".transport_type", version=version, resource=resource, resource_id=resource_id)
-                ]   
+    base_data = ["constraints/", "staged/", "active/", "transportfile/", "transporttype/"]
 
     return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
 
