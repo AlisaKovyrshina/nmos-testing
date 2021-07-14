@@ -391,10 +391,7 @@ def query(version):
 
     registry.query_api_called = True
 
-    resources = ['devices', 'flows', 'nodes', 'receivers', 'senders', 'sources', 'subscriptions']
-    base_data = []
-    for resource in resources:
-        base_data.append(flask.url_for('.query_resource', version=version, resource=resource))
+    base_data = ['devices/', 'flows/', 'nodes/', 'receivers/', 'senders/', 'sources/', 'subscriptions/']
 
     return createCORSResponse(Response(json.dumps(base_data), mimetype='application/json'))
 
