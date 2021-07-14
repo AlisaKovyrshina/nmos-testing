@@ -353,9 +353,12 @@ class JTNMTest(GenericTest):
             self._register_receiver(self.receivers[i])
             self.receivers[i]['registered'] = True
 
+        # Send registered sender and receiver details over to mock node
+        self.node.add_senders(self.senders, self.test_data['sender'])
+        self.node.add_receivers(self.receivers, self.test_data['receiver'])
+
     def load_resource_data(self):
         """Loads test data from files"""
-        api = self.apis[JTNM_API_KEY]
         result_data = dict()
         resources = ["node", "device", "source", "flow", "sender", "receiver"]
         for resource in resources:
@@ -422,6 +425,7 @@ class JTNMTest(GenericTest):
         node_data['label'] = label
         node_data["description"] = description
         self.post_resource(self, "node", node_data, codes=[201])
+        self.node.registry_url = self.mock_registry_base_url
 
     def _register_sender(self, sender, codes=[201], fail=Test.FAIL):
         """
