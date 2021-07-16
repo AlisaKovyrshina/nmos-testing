@@ -340,7 +340,7 @@ class JTNMTest(GenericTest):
         for receiver in self.receivers:
             receiver["id"] = str(uuid.uuid4())
             receiver["device_id"] = str(uuid.uuid4())
-            receiver["controls_href"] = self.mock_node_base_url + "/x-nmos/connection/v1.0/"
+            receiver["controls_href"] = self.mock_node_base_url + "x-nmos/connection/v1.0/"
             receiver["registered"] = False
             receiver["connectable"] = True
             receiver["answer_str"] = self._format_device_metadata(receiver['label'], receiver['description'], receiver['id'])
@@ -441,7 +441,7 @@ class JTNMTest(GenericTest):
         device_data["label"] = "AMWA Test Device"
         device_data["description"] = "AMWA Test Device"
         device_data["node_id"] = self.node.id
-        device_data["controls"] = [] # Remove controls data
+        device_data["controls"][0]["href"] = self.mock_node_base_url + "x-nmos/connection/v1.0/"
         device_data["senders"] = [ sender["id"] ] 
         device_data["receivers"] = [] 
         self.post_resource(self, "device", device_data, codes=codes, fail=fail)
@@ -720,7 +720,7 @@ class JTNMTest(GenericTest):
             for receiver in test_06_receivers:
                 receiver["id"] = str(uuid.uuid4())
                 receiver["device_id"] = str(uuid.uuid4())
-                receiver["controls_href"] = self.mock_node_base_url + "/x-nmos/connection/v1.0/"
+                receiver["controls_href"] = self.mock_node_base_url + "x-nmos/connection/v1.0/"
                 receiver["registered"] = True
                 receiver["connectable"] = random.choice([True, False])
                 receiver["answer_str"] = self._format_device_metadata(receiver['label'], receiver['description'], receiver['id'])
@@ -732,7 +732,7 @@ class JTNMTest(GenericTest):
             possible_answers = [r['answer_str'] for r in test_06_receivers]
             expected_answers = [r['answer_str'] for r in test_06_receivers if r['connectable'] == True]
 
-            actual_answers = self._invoke_client_facade(question, possible_answers, test_type="checkbox", timeout=30)['answer_response']
+            actual_answers = self._invoke_client_facade(question, possible_answers, test_type="checkbox")['answer_response']
 
             if len(actual_answers) != len(expected_answers):
                 return test.FAIL('Incorrect Receiver identified')

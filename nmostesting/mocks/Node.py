@@ -67,14 +67,14 @@ class Node(object):
         self.sender_base_data = sender_base_data
         for sender in senders:
             sender['transport_file'] = sender['manifest_href']
-            sender['transport_params'] = {"destination_ip": "auto",
+            sender['transport_params'] = [{"destination_ip": "auto",
                                            "destination_port": "auto",
                                            "rtp_enabled": True,
                                            "source_ip": {
                                                "enum": [get_default_ip()]
                                             },
                                            "source_port": "auto"
-                                        }
+                                        }]
             sender['staged'] = { 
                 "activation": {
                     "activation_time": None,
@@ -104,12 +104,12 @@ class Node(object):
         """
         self.receiver_base_data = receiver_base_data
         for receiver in receivers:
-            receiver['transport_params'] = {"destination_port": "auto",
+            receiver['transport_params'] = [{"destination_port": "auto",
                                             "interface_ip": "auto",
                                             "multicast_ip": None,
                                             "rtp_enabled": True,
                                             "source_ip": None
-                                            }
+                                            }]
             receiver['staged'] = {"activation": {
                                       "activation_time": None,
                                       "mode": None,
@@ -193,7 +193,10 @@ def resources(version, resource):
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>', methods=["GET"], strict_slashes=False)
 def connection(version, resource, resource_id):
-    base_data = ["constraints/", "staged/", "active/", "transportfile/", "transporttype/"]
+    if resource == 'senders':
+        base_data = ["constraints/", "staged/", "active/", "transportfile/", "transporttype/"]
+    elif resource == 'receivers':
+        base_data = ["constraints/", "staged/", "active/", "transporttype/"]
 
     return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
 
@@ -371,7 +374,6 @@ def transport_type(version, resource, resource_id):
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>/transportfile', methods=["GET"], strict_slashes=False)
 def transport_file(version, resource, resource_id):
     # GET should either redirect to the location of the transport file or return it directly (easy-nmos requests to this endpoint return 404)
-    
     try: 
         resource_index = [i for i, s in enumerate(NODE.senders) if s['id'] == resource_id][0]
     except IndexError:
@@ -379,5 +381,5 @@ def transport_file(version, resource, resource_id):
         abort(404)
     
     file = NODE.senders[resource_index]['transport_file']
-
-    return redirect(file, code=307)
+    # return redirect(file, code=307)
+    return make_response(createCORSResponse(Response(json.dumps(file), mimetype='application/json')))
