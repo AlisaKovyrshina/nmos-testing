@@ -711,11 +711,10 @@ class JTNMTest(GenericTest):
         try:
             # Register receivers, some of which are non connectable
                     # Receiver initial details
-            test_06_receivers = [{'label': 'Test-node-2/receiver/partridge', 'description': 'Mock receiver 7'},
-                              {'label': 'Test-node-2/receiver/moulding', 'description': 'Mock receiver 8'},
-                              {'label': 'Test-node-2/receiver/gregory', 'description': 'Mock receiver 9'},
-                              {'label': 'Test-node-2/receiver/chambers', 'description': 'Mock receiver 10'},
-                              {'label': 'Test-node-2/receiver/andrews', 'description': 'Mock receiver 11'}]
+            test_06_receivers = [{'label': 'Test-node-2/receiver/byrne', 'description': 'Mock receiver 7'},
+                              {'label': 'Test-node-2/receiver/frantz', 'description': 'Mock receiver 8'},
+                              {'label': 'Test-node-2/receiver/weymouth', 'description': 'Mock receiver 9'},
+                              {'label': 'Test-node-2/receiver/harrison', 'description': 'Mock receiver 10'}]
 
             for receiver in test_06_receivers:
                 receiver["id"] = str(uuid.uuid4())
