@@ -317,7 +317,7 @@ class JTNMTest(GenericTest):
             sender["device_id"] = str(uuid.uuid4())
             sender["flow_id"] = str(uuid.uuid4())
             sender["source_id"] = str(uuid.uuid4())
-            sender["manifest_href"] = self.mock_node_base_url + "/video.sdp"
+            sender["manifest_href"] = self.mock_node_base_url + "video.sdp"
             sender["registered"] = False
             sender["answer_str"] = self._format_device_metadata(sender['label'], sender['description'], sender['id'])
 
