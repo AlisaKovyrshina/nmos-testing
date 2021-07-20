@@ -148,10 +148,6 @@ class Node(object):
 NODE = Node(1)
 NODE_API = Blueprint('node_api', __name__)
 
-def createCORSResponse(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    return response
-
 
 @NODE_API.route('/<stream_type>.sdp', methods=["GET"])
 def node_video_sdp(stream_type):
@@ -178,7 +174,7 @@ def node_video_sdp(stream_type):
 @NODE_API.route('/x-nmos/connection/<version>/single', methods=['GET'], strict_slashes=False)
 def single(version):
     base_data = ['senders/', 'receivers/']
-    return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
+    return make_response(Response(json.dumps(base_data), mimetype='application/json'))
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/', methods=["GET"], strict_slashes=False)
 def resources(version, resource):
@@ -189,7 +185,7 @@ def resources(version, resource):
 
     base_data = [r['id'] + '/' for r in resource_list]
 
-    return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
+    return make_response(Response(json.dumps(base_data), mimetype='application/json'))
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>', methods=["GET"], strict_slashes=False)
 def connection(version, resource, resource_id):
@@ -198,7 +194,7 @@ def connection(version, resource, resource_id):
     elif resource == 'receivers':
         base_data = ["constraints/", "staged/", "active/", "transporttype/"]
 
-    return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
+    return make_response(Response(json.dumps(base_data), mimetype='application/json'))
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>/constraints', methods=["GET"], strict_slashes=False)
 def constraints(version, resource, resource_id):
@@ -213,7 +209,7 @@ def constraints(version, resource, resource_id):
         "source_port": {}
     }]
 
-    return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
+    return make_response(Response(json.dumps(base_data), mimetype='application/json'))
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>/staged', methods=["GET", "PATCH"], strict_slashes=False)
 def staged(version, resource, resource_id):
@@ -363,7 +359,7 @@ def staged(version, resource, resource_id):
         # Need to fetch json of actual current 'staged' info
             base_data = resource_list[resource_index]['staged']
 
-    return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
+    return make_response(Response(json.dumps(base_data), mimetype='application/json'))
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>/active', methods=["GET"], strict_slashes=False)
 def active(version, resource, resource_id):
@@ -380,7 +376,7 @@ def active(version, resource, resource_id):
     
     base_data = resource_list[resource_index]['active']
 
-    return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
+    return make_response(Response(json.dumps(base_data), mimetype='application/json'))
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>/transporttype', methods=["GET"], strict_slashes=False)
 def transport_type(version, resource, resource_id):
@@ -388,7 +384,7 @@ def transport_type(version, resource, resource_id):
     base_data = "urn:x-nmos:transport:websocket"
     # alternatively "urn:x-nmos:transport:rtp.mcast"
 
-    return make_response(createCORSResponse(Response(json.dumps(base_data), mimetype='application/json')))
+    return make_response(Response(json.dumps(base_data), mimetype='application/json'))
 
 @NODE_API.route('/x-nmos/connection/<version>/single/<resource>/<resource_id>/transportfile', methods=["GET"], strict_slashes=False)
 def transport_file(version, resource, resource_id):
@@ -401,4 +397,4 @@ def transport_file(version, resource, resource_id):
     
     file = NODE.senders[resource_index]['transport_file']
     # return redirect(file, code=307)
-    return make_response(createCORSResponse(Response(json.dumps(file), mimetype='application/json')))
+    return make_response(Response(json.dumps(file), mimetype='application/json'))
