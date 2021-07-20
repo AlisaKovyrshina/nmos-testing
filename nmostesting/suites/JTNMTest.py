@@ -92,21 +92,11 @@ class JTNMTest(GenericTest):
             self.dns_server.load_zone(self.apis[JTNM_API_KEY]["version"], self.protocol, self.authorization,
                                       "test_data/JTNM/dns_records.zone", CONFIG.PORT_BASE+100)
           
-        if CONFIG.DNS_SD_MODE == "multicast":
-            priority = 0
-
-            # Add advertisement for primary registry
-            info = self._registry_mdns_info(self.primary_registry.get_data().port, priority)
-            self.registry_mdns.append(info)
-
         # Reset registry to clear previous heartbeats, etc.
         self.primary_registry.reset()
         self.primary_registry.enable()
         self.mock_registry_base_url = 'http://' + get_default_ip() + ':' + str(self.primary_registry.get_data().port) + '/'
         self.mock_node_base_url = 'http://' + get_default_ip() + ':' + str(self.node.port) + '/'
-
-        if CONFIG.DNS_SD_MODE == "multicast":
-            self.zc.register_service(self.registry_mdns[0])
 
         # Populate mock registry with senders and receivers and store the results
         self._populate_registry()
@@ -115,10 +105,7 @@ class JTNMTest(GenericTest):
 
 
     def tear_down_tests(self):
-        # Clean up mDNS advertisements and disable registries
-        if CONFIG.DNS_SD_MODE == "multicast":
-            for info in self.registry_mdns:
-                self.zc.unregister_service(info)
+
         self.primary_registry.disable()
         
         # Reset the state of the client testing façade
@@ -553,9 +540,9 @@ class JTNMTest(GenericTest):
         """
         Ensure BCuT uses DNS-SD to find registry
         """
-        if not CONFIG.ENABLE_DNS_SD or CONFIG.DNS_SD_MODE != "multicast":
+        if not CONFIG.ENABLE_DNS_SD or CONFIG.DNS_SD_MODE != "unicast":
             return test.DISABLED("This test cannot be performed when ENABLE_DNS_SD is False or DNS_SD_MODE is not "
-                                 "'multicast'")
+                                 "'unicast'")
 
         return test.DISABLED("Test not yet implemented")
 
