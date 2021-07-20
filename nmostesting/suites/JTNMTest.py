@@ -90,20 +90,8 @@ class JTNMTest(GenericTest):
         self.zc_listener = MdnsListener(self.zc)
         if self.dns_server:
             self.dns_server.load_zone(self.apis[JTNM_API_KEY]["version"], self.protocol, self.authorization,
-                                      "test_data/IS0401/dns_records.zone", CONFIG.PORT_BASE+100)
-            print(" * Waiting for up to {} seconds for a DNS query before executing tests"
-                  .format(CONFIG.DNS_SD_ADVERT_TIMEOUT))
-            self.dns_server.wait_for_query(
-                QTYPE.PTR,
-                [
-                    "_nmos-register._tcp.{}.".format(CONFIG.DNS_DOMAIN),
-                    "_nmos-registration._tcp.{}.".format(CONFIG.DNS_DOMAIN)
-                ],
-                CONFIG.DNS_SD_ADVERT_TIMEOUT
-            )
-            # Wait for a short time to allow the device to react after performing the query
-            time.sleep(CONFIG.API_PROCESSING_TIMEOUT)
-
+                                      "test_data/JTNM/dns_records.zone", CONFIG.PORT_BASE+100)
+          
         if CONFIG.DNS_SD_MODE == "multicast":
             priority = 0
 
