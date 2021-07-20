@@ -91,7 +91,13 @@ class JTNMTest(GenericTest):
         if self.dns_server:
             self.dns_server.load_zone(self.apis[JTNM_API_KEY]["version"], self.protocol, self.authorization,
                                       "test_data/JTNM/dns_records.zone", CONFIG.PORT_BASE+100)
-          
+            self.dns_server.set_expected_query(
+                QTYPE.PTR,
+                [
+                    "_nmos-register._tcp.{}.".format(CONFIG.DNS_DOMAIN),
+                    "_nmos-registration._tcp.{}.".format(CONFIG.DNS_DOMAIN)
+                ]
+            )
         # Reset registry to clear previous heartbeats, etc.
         self.primary_registry.reset()
         self.primary_registry.enable()
@@ -544,8 +550,19 @@ class JTNMTest(GenericTest):
             return test.DISABLED("This test cannot be performed when ENABLE_DNS_SD is False or DNS_SD_MODE is not "
                                  "'unicast'")
 
-        return test.DISABLED("Test not yet implemented")
+        question = 'Use unicast DNS to discovery the mock registry.\n\n ' \
+        'Ensure that the following configuration has been set on the BCuT machine. \n' \
+        '* Ensure that the primary DNS of the BCuT machine has been set to \"' + get_default_ip() + '\". \n' \
+        '* Ensure that the BCuT unicast search domain is set to \"' + CONFIG.DNS_DOMAIN + '\". \n\n' \
+        'Once you have configured the BCuT please click the \'Next\' button. Successful querying of the DNS will be automatically logged by the test framework.\n'
 
+        self._invoke_client_facade(question, [], test_type="action")
+
+        # The DNS server will log queries that have been specified in set_up_tests()
+        if not self.dns_server.is_query_received():
+            return test.FAIL('DNS was not queried by the BCuT')
+            
+        return test.PASS('DNS successfully queried by BCuT')
 
     def test_02(self, test):
         """
