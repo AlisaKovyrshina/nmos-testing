@@ -30,6 +30,7 @@ class Node(object):
         self.sender_base_data = ''
         self.receiver_base_data = ''
         self.registry_url = ''
+        self.staged_requests = []
 
     def get_sender(self, stream_type="video"):
         protocol = "http"
@@ -139,6 +140,8 @@ class Node(object):
 
             self.receivers.append(receiver)
 
+    def clear_staged_requests(self):
+        self.staged_requests = []
 
 NODE = Node(1)
 NODE_API = Blueprint('node_api', __name__)
@@ -214,6 +217,7 @@ def staged(version, resource, resource_id):
     activating a connection without staging or deactivating an active connection
     Updates data then POSTs updated receiver to registry
     """
+    NODE.staged_requests.append({'method': request.method, 'resource': resource, 'resource_id': resource_id, 'data': request.json})
     if resource == 'senders':
         resource_list = NODE.senders
     elif resource == 'receivers':
