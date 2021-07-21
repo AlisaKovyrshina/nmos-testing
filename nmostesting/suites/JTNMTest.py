@@ -812,7 +812,7 @@ class JTNMTest(GenericTest):
 
         # Send PATCH request to remove the subscription at the end of the test
         deactivate_json = {"transport_params":[{}],"activation":{"mode":"activate_immediate"}}
-        deactivate_url = self.mock_node_base_url + '/x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
+        deactivate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
         self.do_request('PATCH', deactivate_url, json=deactivate_json)
         return test.PASS("Connection successfully established")
 
@@ -820,8 +820,56 @@ class JTNMTest(GenericTest):
         """
         Disconnecting a Receiver from a connected Flow via IS-05
         """
+        # Choose random sender and receiver to be connected
+        registered_senders = [s for s in self.senders if s['registered'] == True]
+        sender = random.choice(registered_senders)
+        registered_receivers = [r for r in self.receivers if r['registered'] == True]
+        receiver = random.choice(registered_receivers)
 
-        return test.DISABLED("Test not yet implemented")
+        # Send PATCH request to node to set up connection
+        activate_json = {"transport_params":[{"rtp_enabled":True}],"activation":{"mode":"activate_immediate"},"master_enable":True,"sender_id":sender['id'],"transport_file":{"data":sender['manifest_href'],"type":"application/sdp"}}
+        activate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
+        self.do_request('PATCH', activate_url, json=activate_json)
+
+        # Clear staged requests once connection has been set up
+        self.node.clear_staged_requests()
+
+        question = 'Instruct your BCuT to disconnect receiver \n\n' + receiver['answer_str'] + '\n\n from sender \n\n' + \
+            sender['answer_str'] + '\n\nClick Next once the connection has been made inactive.'
+        possible_answers = []
+
+        self._invoke_client_facade(question, possible_answers, test_type="action")
+
+        # Check the staged API endpoint received a PATCH request
+        patch_requests = [r for r in self.node.staged_requests if r['method'] == 'PATCH']
+        if len(patch_requests) < 1:
+            return test.FAIL('No PATCH request was received by the node')
+        elif len(patch_requests) > 1:
+            return test.FAIL('Multiple PATCH requests were received by the node')
+        else:
+            # Should be one PATCH request for disconnection
+            if patch_requests[0]['resource_id'] != receiver['id']:
+                return test.FAIL('Disconnection request sent to incorrect receiver')
+
+            if 'activation' not in patch_requests[0]['data']:
+                return test.FAIL('No activation details in PATCH request')
+            elif 'mode' not in patch_requests[0]['data']['activation']:
+                return test.FAIL('No activation mode found in PATCH request')
+            elif patch_requests[0]['data']['activation']['mode'] != 'activate_immediate':
+                return test.FAIL('Activation mode in PATCH request was not activate_immediate')
+
+            # Check the receiver has empty subscription details
+            if receiver['id'] in self.primary_registry.get_resources()["receiver"]:
+                receiver_details = self.primary_registry.get_resources()["receiver"][receiver['id']]
+
+                if receiver_details['subscription']['active'] == True or receiver_details['subscription']['sender_id'] == sender['id']:
+                    return test.FAIL('Receiver still has subscription')
+
+        # Send PATCH request to make sure the subscription is removed at the end of the test
+        deactivate_json = {"transport_params":[{}],"activation":{"mode":"activate_immediate"}}
+        deactivate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
+        self.do_request('PATCH', deactivate_url, json=deactivate_json)
+        return test.PASS('Receiver successfully disconnected from sender')
 
     def test_09(self, test):
         """
