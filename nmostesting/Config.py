@@ -271,8 +271,8 @@ SPECIFICATIONS = {
     },
     "jt-nm-tested": {
         "repo": None,
-        "versions": ["v1.0"],
-        "default_version": "v1.0",
+        "versions": ["v1.3"],
+        "default_version": "v1.3",
         "apis": {
             "client-testing": {
                 "name": "Client Testing Façade"
