@@ -4,7 +4,7 @@ mocks.{{ domain }}.	IN	A	{{ ip_address }}
 {% for api, srv in [('reg', 'registration'), ('reg', 'register'), ('qry', 'query')] %}
 
 {% set registries = [
-	('2',		port_base + 2,	'mocks',	api_ver,	api_proto,	api_auth, 20)
+	('2',		port_base + 2,	'mocks',	api_ver,	api_proto,	api_auth, 0)
 ] %}
 
 {% for inst, port, host, ver, proto, auth, pri in registries %}
