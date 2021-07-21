@@ -237,7 +237,7 @@ def staged(version, resource, resource_id):
             # Either patching to staged or directly to activated
             sender = [s for s in NODE.senders if s['id'] == request.json['sender_id']][0]
             # Data for response
-            base_data['master_enable'] = request.json['master_enable']
+            base_data['master_enable'] = True
             base_data['sender_id'] = request.json['sender_id']
             base_data['transport_file'] = sender['transport_file']
             base_data['transport_params'] = request.json['transport_params']
@@ -270,7 +270,7 @@ def staged(version, resource, resource_id):
             else:
                 # Staging
                 # Update resource data but nothing should change in registry
-                resource_details['staged']['master_enable'] = request.json['master_enable']
+                resource_details['staged']['master_enable'] = True
                 resource_details['staged']['sender_id'] = request.json['sender_id']
                 resource_details['staged']['transport_file'] = sender['transport_file']
                 resource_details['staged']['transport_params'] = request.json['transport_params']
@@ -281,7 +281,7 @@ def staged(version, resource, resource_id):
 
         elif "activation" in request.json:
             # Either patching to activate after staging or deactivating
-            if 'mode' in request.json['activation'] and request.json['activation'] ['mode']== 'activate_immediate':
+            if 'mode' in request.json['activation'] and request.json['activation']['mode']== 'activate_immediate':
                 if resource_details['staged']['master_enable'] == True:
                     # Activating after staging
                     # Base data for response
