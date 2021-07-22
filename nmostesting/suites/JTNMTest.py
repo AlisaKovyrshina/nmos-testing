@@ -751,117 +751,127 @@ class JTNMTest(GenericTest):
         """
         Instruct Receiver to subscribe to a Sender’s Flow via IS-05
         """
-        self.node.clear_staged_requests()
-        # Choose random sender and receiver to be connected
-        registered_senders = [s for s in self.senders if s['registered'] == True]
-        sender = random.choice(registered_senders)
-        registered_receivers = [r for r in self.receivers if r['registered'] == True]
-        receiver = random.choice(registered_receivers)
+        try:
+            self.node.clear_staged_requests()
+            # Choose random sender and receiver to be connected
+            registered_senders = [s for s in self.senders if s['registered'] == True]
+            sender = random.choice(registered_senders)
+            registered_receivers = [r for r in self.receivers if r['registered'] == True]
+            receiver = random.choice(registered_receivers)
 
-        question = "Instruct your BCuT to activate a connection between receiver \n\n" + receiver['answer_str'] + \
-            "\n\n and sender \n\n" + sender['answer_str'] + "\n\nClick Next once the connection is active."
-        possible_answers = []
+            question = "Instruct your BCuT to activate a connection between receiver \n\n" + receiver['answer_str'] + \
+                "\n\n and sender \n\n" + sender['answer_str'] + "\n\nClick Next once the connection is active."
+            possible_answers = []
 
-        self._invoke_client_facade(question, possible_answers, test_type="action")
+            self._invoke_client_facade(question, possible_answers, test_type="action")
 
-        # Check the staged API endpoint received a PATCH request
-        patch_requests = [r for r in self.node.staged_requests if r['method'] == 'PATCH']
-        if len(patch_requests) < 1:
-            return test.FAIL('No PATCH request was received by the node')
-        elif len(patch_requests) < 3:
-            # One request should be direct activation, two if staged first
-            # First request should contain sender id and master enable
-            if patch_requests[0]['resource_id'] != receiver['id']:
-                return test.FAIL('Connection request sent to incorrect receiver')
+            # Check the staged API endpoint received a PATCH request
+            patch_requests = [r for r in self.node.staged_requests if r['method'] == 'PATCH']
+            if len(patch_requests) < 1:
+                return test.FAIL('No PATCH request was received by the node')
+            elif len(patch_requests) < 3:
+                # One request should be direct activation, two if staged first
+                # First request should contain sender id and master enable
+                if patch_requests[0]['resource_id'] != receiver['id']:
+                    return test.FAIL('Connection request sent to incorrect receiver')
 
-            if 'master_enable' not in patch_requests[0]['data'] or 'sender_id' not in patch_requests[0]['data']:
-                return test.FAIL('Sender id or master enable not found in PATCH request')
-            else:
-                if patch_requests[0]['data']['master_enable'] != True:
-                    return test.FAIL('Master_enable not set to True in PATCH request')
+                if 'master_enable' not in patch_requests[0]['data'] or 'sender_id' not in patch_requests[0]['data']:
+                    return test.FAIL('Sender id or master enable not found in PATCH request')
+                else:
+                    if patch_requests[0]['data']['master_enable'] != True:
+                        return test.FAIL('Master_enable not set to True in PATCH request')
 
-                if patch_requests[0]['data']['sender_id'] != sender['id']:
-                    return test.FAIL('Incorrect sender found in PATCH request')
+                    if patch_requests[0]['data']['sender_id'] != sender['id']:
+                        return test.FAIL('Incorrect sender found in PATCH request')
 
-            # Activation details may be in either request. If not in first must have staged first so should be in second to activate
-            if 'activation' not in patch_requests[0]['data']:
-                if len(patch_requests) == 2 and 'activation' not in patch_requests[1]['data']:
-                    return test.FAIL('No activation details in PATCH request')
+                # Activation details may be in either request. If not in first must have staged first so should be in second to activate
+                if 'activation' not in patch_requests[0]['data']:
+                    if len(patch_requests) == 2 and 'activation' not in patch_requests[1]['data']:
+                        return test.FAIL('No activation details in PATCH request')
+                # Hmm Possibly need to check if activation['mode'] == 'activate_immediate' but can schedule activation, 
             # Hmm Possibly need to check if activation['mode'] == 'activate_immediate' but can schedule activation, 
-            # would it be likely for someone to schedule activation for 30s time or something during the test?
-        else:
-            return test.UNCLEAR('Multiple PATCH requests were found')
+                # Hmm Possibly need to check if activation['mode'] == 'activate_immediate' but can schedule activation, 
+                # would it be likely for someone to schedule activation for 30s time or something during the test?
+            else:
+                return test.UNCLEAR('Multiple PATCH requests were found')
 
-        # Check the receiver now has subscription details
-        if receiver['id'] in self.primary_registry.get_resources()["receiver"]:
-            receiver_details = self.primary_registry.get_resources()["receiver"][receiver['id']]
+            # Check the receiver now has subscription details
+            if receiver['id'] in self.primary_registry.get_resources()["receiver"]:
+                receiver_details = self.primary_registry.get_resources()["receiver"][receiver['id']]
 
-            if receiver_details['subscription']['active'] != True:
-                return test.FAIL('Receiver does not have active subscription')
+                if receiver_details['subscription']['active'] != True:
+                    return test.FAIL('Receiver does not have active subscription')
 
-            if receiver_details['subscription']['sender_id'] != sender['id']:
-                return test.FAIL('Receiver did not connect to correct sender')
+                if receiver_details['subscription']['sender_id'] != sender['id']:
+                    return test.FAIL('Receiver did not connect to correct sender')
 
-        # Send PATCH request to remove the subscription at the end of the test
-        deactivate_json = {"transport_params":[{}],"activation":{"mode":"activate_immediate"}}
-        deactivate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
-        self.do_request('PATCH', deactivate_url, json=deactivate_json)
-        return test.PASS("Connection successfully established")
+            return test.PASS("Connection successfully established")
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
+        finally:
+            #Remove subscription
+            deactivate_json = {"transport_params":[{}],"activation":{"mode":"activate_immediate"}}
+            deactivate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
+            self.do_request('PATCH', deactivate_url, json=deactivate_json)
 
     def test_08(self, test):
         """
         Disconnecting a Receiver from a connected Flow via IS-05
         """
-        # Choose random sender and receiver to be connected
-        registered_senders = [s for s in self.senders if s['registered'] == True]
-        sender = random.choice(registered_senders)
-        registered_receivers = [r for r in self.receivers if r['registered'] == True]
-        receiver = random.choice(registered_receivers)
+        try:
+            # Choose random sender and receiver to be connected
+            registered_senders = [s for s in self.senders if s['registered'] == True]
+            sender = random.choice(registered_senders)
+            registered_receivers = [r for r in self.receivers if r['registered'] == True]
+            receiver = random.choice(registered_receivers)
 
-        # Send PATCH request to node to set up connection
-        activate_json = {"transport_params":[{"rtp_enabled":True}],"activation":{"mode":"activate_immediate"},"master_enable":True,"sender_id":sender['id'],"transport_file":{"data":sender['manifest_href'],"type":"application/sdp"}}
-        activate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
-        self.do_request('PATCH', activate_url, json=activate_json)
+            # Send PATCH request to node to set up connection
+            activate_json = {"transport_params":[{"rtp_enabled":True}],"activation":{"mode":"activate_immediate"},"master_enable":True,"sender_id":sender['id'],"transport_file":{"data":sender['manifest_href'],"type":"application/sdp"}}
+            activate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
+            self.do_request('PATCH', activate_url, json=activate_json)
 
-        # Clear staged requests once connection has been set up
-        self.node.clear_staged_requests()
+            # Clear staged requests once connection has been set up
+            self.node.clear_staged_requests()
 
-        question = 'Instruct your BCuT to disconnect receiver \n\n' + receiver['answer_str'] + '\n\n from sender \n\n' + \
-            sender['answer_str'] + '\n\nClick Next once the connection has been made inactive.'
-        possible_answers = []
+            question = 'Instruct your BCuT to disconnect receiver \n\n' + receiver['answer_str'] + '\n\n from sender \n\n' + \
+                sender['answer_str'] + '\n\nClick Next once the connection has been made inactive.'
+            possible_answers = []
 
-        self._invoke_client_facade(question, possible_answers, test_type="action")
+            self._invoke_client_facade(question, possible_answers, test_type="action")
 
-        # Check the staged API endpoint received a PATCH request
-        patch_requests = [r for r in self.node.staged_requests if r['method'] == 'PATCH']
-        if len(patch_requests) < 1:
-            return test.FAIL('No PATCH request was received by the node')
-        elif len(patch_requests) > 1:
-            return test.FAIL('Multiple PATCH requests were received by the node')
-        else:
-            # Should be one PATCH request for disconnection
-            if patch_requests[0]['resource_id'] != receiver['id']:
-                return test.FAIL('Disconnection request sent to incorrect receiver')
+            # Check the staged API endpoint received a PATCH request
+            patch_requests = [r for r in self.node.staged_requests if r['method'] == 'PATCH']
+            if len(patch_requests) < 1:
+                return test.FAIL('No PATCH request was received by the node')
+            elif len(patch_requests) > 1:
+                return test.FAIL('Multiple PATCH requests were received by the node')
+            else:
+                # Should be one PATCH request for disconnection
+                if patch_requests[0]['resource_id'] != receiver['id']:
+                    return test.FAIL('Disconnection request sent to incorrect receiver')
 
-            if 'activation' not in patch_requests[0]['data']:
-                return test.FAIL('No activation details in PATCH request')
-            elif 'mode' not in patch_requests[0]['data']['activation']:
-                return test.FAIL('No activation mode found in PATCH request')
-            elif patch_requests[0]['data']['activation']['mode'] != 'activate_immediate':
-                return test.FAIL('Activation mode in PATCH request was not activate_immediate')
+                if 'activation' not in patch_requests[0]['data']:
+                    return test.FAIL('No activation details in PATCH request')
+                elif 'mode' not in patch_requests[0]['data']['activation']:
+                    return test.FAIL('No activation mode found in PATCH request')
+                elif patch_requests[0]['data']['activation']['mode'] != 'activate_immediate':
+                    return test.FAIL('Activation mode in PATCH request was not activate_immediate')
 
-            # Check the receiver has empty subscription details
-            if receiver['id'] in self.primary_registry.get_resources()["receiver"]:
-                receiver_details = self.primary_registry.get_resources()["receiver"][receiver['id']]
+                # Check the receiver has empty subscription details
+                if receiver['id'] in self.primary_registry.get_resources()["receiver"]:
+                    receiver_details = self.primary_registry.get_resources()["receiver"][receiver['id']]
 
-                if receiver_details['subscription']['active'] == True or receiver_details['subscription']['sender_id'] == sender['id']:
-                    return test.FAIL('Receiver still has subscription')
-
-        # Send PATCH request to make sure the subscription is removed at the end of the test
-        deactivate_json = {"transport_params":[{}],"activation":{"mode":"activate_immediate"}}
-        deactivate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
-        self.do_request('PATCH', deactivate_url, json=deactivate_json)
-        return test.PASS('Receiver successfully disconnected from sender')
+                    if receiver_details['subscription']['active'] == True or receiver_details['subscription']['sender_id'] == sender['id']:
+                        return test.FAIL('Receiver still has subscription')
+            
+            return test.PASS('Receiver successfully disconnected from sender')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
+        finally:
+            #Remove subscription
+            deactivate_json = {"transport_params":[{}],"activation":{"mode":"activate_immediate"}}
+            deactivate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
+            self.do_request('PATCH', deactivate_url, json=deactivate_json)
 
     def test_09(self, test):
         """
