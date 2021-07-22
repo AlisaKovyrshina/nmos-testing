@@ -877,6 +877,62 @@ class JTNMTest(GenericTest):
         """
         Indicating the state of connections via updates received from the IS-04 Query API
         """
+        try:
+            # Choose random sender and receiver to be connected
+            registered_senders = [s for s in self.senders if s['registered'] == True]
+            sender = random.choice(registered_senders)
+            registered_receivers = [r for r in self.receivers if r['registered'] == True]
+            receiver = random.choice(registered_receivers)
 
-        return test.DISABLED("Test not yet implemented")
+            # Send PATCH request to node to set up connection
+            activate_json = {"transport_params":[{"rtp_enabled":True}],"activation":{"mode":"activate_immediate"},"master_enable":True,"sender_id":sender['id'],"transport_file":{"data":sender['manifest_href'],"type":"application/sdp"}}
+            activate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
+            self.do_request('PATCH', activate_url, json=activate_json)
 
+            # Identify a connection
+            question = "The BCut should be able to monitor and update the connection status of all registered Devices.\n\n" \
+                "Use the BCut to identify the sender currently connected to the receiver \n\n" + receiver['answer_str']
+            possible_answers = [s['answer_str'] for s in self.senders if s['registered'] == True]
+            expected_answer = sender['answer_str']
+
+            actual_answer = self._invoke_client_facade(question, possible_answers, test_type="radio")['answer_response']
+
+            if actual_answer != expected_answer:
+                return test.FAIL('Incorrect sender identified')
+
+            max_time_until_online = 60
+            max_time_to_answer = 30
+
+            # Indicate when connection has gone offline
+            question = "The connection on receiver \n\n" + receiver['answer_str'] + "\n\n will be disconnected at a random moment " \
+                "within the next " + str(max_time_until_online) + " seconds. As soon as the BCuT detects the connection is inactive " \
+                "please press the 'Next' button.\n\nThe button must be pressed within " + str(max_time_to_answer)  + " seconds of the " \
+                "connection being removed. This includes any latency between the connection being removed and the BCuT updating."
+            possible_answers = []
+
+            # Get the name of the calling test method to use as an identifier
+            test_method_name = inspect.currentframe().f_code.co_name
+
+            # Send the question to the Client Façade and then put sender online before waiting for the Client Facade response
+            sent_json = self._send_client_facade_questions(test_method_name, question, possible_answers, test_type="action")
+
+            # Wait a random amount of time before disconnecting
+            time.sleep(random.randint(10, max_time_until_online))
+
+            time_online = time.time()
+
+            # Remove connection
+            deactivate_json = {"transport_params":[{}],"activation":{"mode":"activate_immediate"}}
+            deactivate_url = self.mock_node_base_url + 'x-nmos/connection/v1.1/single/receivers/' + receiver['id'] + '/staged'
+            self.do_request('PATCH', deactivate_url, json=deactivate_json)
+
+            response = self._wait_for_client_facade(sent_json['name'])
+
+            if response['time_answered'] < time_online: # Answered before connection was removed
+                return test.FAIL('Connection not handled: Connection still active')
+            elif response['time_answered'] > time_online + max_time_to_answer:
+                return test.FAIL('Connection not handled: Connection removed '  + str(int(response['time_answered'] - time_online)) + ' seconds ago')
+            else:
+                return test.PASS('Connection handled correctly')
+        except ClientFacadeException as e:
+            return test.UNCLEAR(e.args[0])
