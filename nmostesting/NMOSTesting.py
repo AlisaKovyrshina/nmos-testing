@@ -34,6 +34,7 @@ import pkgutil
 import shlex
 
 from flask import Flask, render_template, flash, request, make_response, jsonify
+from flask_cors import CORS
 from wtforms import Form, validators, StringField, SelectField, SelectMultipleField, IntegerField, HiddenField
 from wtforms import FormField, FieldList
 from werkzeug.serving import WSGIRequestHandler
@@ -76,7 +77,7 @@ from .suites import IS0901Test
 from .suites import IS0902Test
 # from .suites import IS1001Test
 from .suites import BCP00301Test
-from .suites import JTNMTest
+from .suites import NC01Test
 
 FLASK_APPS = []
 DNS_SERVER = None
@@ -86,17 +87,19 @@ CMD_ARGS = None
 CACHEBUSTER = random.randint(1, 10000)
 
 core_app = Flask(__name__)
+CORS(core_app)
 core_app.debug = False
 core_app.config['SECRET_KEY'] = 'nmos-interop-testing-jtnm'
 core_app.config['TEST_ACTIVE'] = False
 core_app.config['PORT'] = CONFIG.PORT_BASE
 core_app.config['SECURE'] = False
 core_app.register_blueprint(NODE_API)  # Dependency for IS0401Test
-core_app.register_blueprint(JTNMTest.TEST_API)
+core_app.register_blueprint(NC01Test.TEST_API)
 FLASK_APPS.append(core_app)
 
 for instance in range(NUM_REGISTRIES):
     reg_app = Flask(__name__)
+    CORS(reg_app)
     reg_app.debug = False
     reg_app.config['REGISTRY_INSTANCE'] = instance
     reg_app.config['PORT'] = REGISTRIES[instance].port
@@ -114,6 +117,7 @@ for instance in range(NUM_SYSTEMS):
     FLASK_APPS.append(sys_app)
 
 sender_app = Flask(__name__)
+CORS(sender_app)
 sender_app.debug = False
 sender_app.config['PORT'] = NODE.port
 sender_app.config['SECURE'] = CONFIG.ENABLE_HTTPS
@@ -279,13 +283,13 @@ TEST_DEFINITIONS = {
         }],
         "class": BCP00301Test.BCP00301Test
     },
-    "JT-NM-Tested": {
-        "name": "JT-NM Client Tests",
+    "NC-01": {
+        "name": "NMOS Controller",
         "specs": [{
-            "spec_key": "jt-nm-tested",
-            "api_key": "client-testing"
+            "spec_key": "nc-01",
+            "api_key": "testing-facade"
         }],
-        "class": JTNMTest.JTNMTest
+        "class": NC01Test.NC01Test
     },
 }
 
@@ -522,7 +526,7 @@ def run_tests(test, endpoints, test_selection=["all"]):
         elif test == "IS-09-02":
             # This test has an unusual constructor as it requires a system api instance
             test_obj = test_def["class"](apis, SYSTEMS, DNS_SERVER)
-        elif test == "JT-NM-Tested":
+        elif test == "NC-01":
             # This test has an unusual constructor as it requires a registry instance
             test_obj = test_def["class"](apis, REGISTRIES, NODE, DNS_SERVER)
         else:
@@ -875,7 +879,7 @@ def run_noninteractive_tests(args):
 
 
 def check_internal_requirements():
-    corrections = {"gitpython": "git", "pyopenssl": "OpenSSL", "websocket-client": "websocket", "paho-mqtt": "paho"}
+    corrections = {"gitpython": "git", "pyopenssl": "OpenSSL", "websocket-client": "websocket", "paho-mqtt": "paho", "Flask-Cors": "flask_cors"}
     installed_pkgs = [pkg[1] for pkg in pkgutil.iter_modules()]
     with open("requirements.txt") as requirements_file:
         for requirement in requirements_file.readlines():

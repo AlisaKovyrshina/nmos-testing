@@ -17,11 +17,12 @@ import json
 
 class DataStore:
     """
-    Store json with test question details for use with JTNM test suite and Client Facade
+    Store json with test question details for use with NMOS Controller test suite and Testing Facade
     """
 
     def __init__(self):
         self.test_type = None
+        self.question_id = None
         self.name = None
         self.description = None
         self.question = None
@@ -32,9 +33,11 @@ class DataStore:
         self.answer_response = None
         self.time_answered = None
         self.status = "Empty"
+        self.metadata = None
 
     def clear(self):
         self.test_type = None
+        self.question_id = None
         self.name = None
         self.description = None
         self.question = None
@@ -45,6 +48,7 @@ class DataStore:
         self.answer_response = None
         self.time_answered = None
         self.status = "Empty"
+        self.metadata = None
 
     def getStatus(self):
         return self.status
@@ -52,6 +56,7 @@ class DataStore:
     def setJson(self, json_str):
         self.status = "Test"
         self.test_type = json_str["test_type"]
+        self.question_id = json_str["question_id"]
         self.name = json_str["name"]
         self.description = json_str["description"]
         self.question = json_str["question"]
@@ -61,10 +66,12 @@ class DataStore:
         self.url_for_response = json_str["url_for_response"]
         self.answer_response = json_str["answer_response"]
         self.time_answered = json_str["time_answered"]
+        self.metadata = json_str["metadata"]
 
     def getJson(self):
         json_data = {
             "test_type": self.test_type,
+            "question_id": self.question_id,
             "name": self.name,
             "description": self.description,
             "question": self.question,
@@ -73,7 +80,8 @@ class DataStore:
             "timeout": self.timeout,
             "url_for_response": self.url_for_response,
             "answer_response": self.answer_response,
-            "time_answered": self.time_answered
+            "time_answered": self.time_answered,
+            "metadata": self.metadata
         }
         return json.dumps(json_data)
 
@@ -83,6 +91,9 @@ class DataStore:
 
     def getTest(self):
         return self.test_type
+    
+    def getQuestionID(self):
+        return self.question_id
     
     def getName(self):
         return self.name
@@ -105,5 +116,7 @@ class DataStore:
     def getUrl(self):
         return self.url_for_response
 
+    def getMetadata(self):
+        return self.metadata
 
 data = DataStore()
