@@ -1,0 +1,27 @@
+{
+  "manufacturer": "AMWA IS-11 Mock sink 4",
+  "manufacture_week": 15,
+  "manufacture_year": 1995,
+  "screen_size": {
+    "width": 53,
+    "height": 30
+  },
+  "gamma": 2.2,
+  "color_samplings": [ "RGB", "YCbCr-4:4:4" ],
+  "established_timings": [
+    {
+      "frame_width": 720,
+      "frame_height": 400,
+      "grain_rate": {
+        "numerator": 70
+      }
+    },
+    {
+      "frame_width": 640,
+      "frame_height": 480,
+      "grain_rate": {
+        "numerator": 60
+      }
+    }
+  ]
+}

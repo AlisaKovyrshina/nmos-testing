@@ -99,10 +99,43 @@ def testing_facade_post(version):
         data.setJson(request.json)
     return 'OK'
 
+
+@app.route('/x-nmos/client-testing/<version>', methods=['POST'], strict_slashes=False)
+def jtnm_tests_post(version):
+    # Should be json from Test Suite with questions
+    json_list = ['test_type', 'name', 'description', 'question', 'answers', 'time_sent', 'url_for_response']
+
+    if 'clear' in request.json and request.json['clear'] == 'True':
+        # End of current tests, clear data store
+        data.clear()
+    elif 'answer_response' in request.json and request.json['answer_response'] != "":
+        # Answer was given, check details compared to question POST to verify answering correct question
+        for entry in json_list:
+            method = getattr(data, 'get' + entry.split('_')[0].capitalize())
+            current = method()
+            if current != request.json[entry]:
+                return False, "{} : {} doesn't match current question details".format(entry, request.json[entry])
+        # All details are consistent so update the data store to contain the answer
+        data.setAnswer(request.json['answer_response'])
+        # POST to test suite to indicate answer has been set
+        valid, response = do_request('POST', request.json['url_for_response'], json={})
+    else:
+        # Should be a new question
+        for entry in json_list:
+            if entry not in request.json:
+                return False, "Missing {}".format(entry)
+        # All required entries are present so update data
+        data.setJson(request.json)
+    return 'OK'
+
+
 @app.route('/controller_questions/', methods=['GET'], strict_slashes=False)
 def controller_questions_get():
     return Response(data.getJson(), mimetype='application/json')
 
+@app.route('/x-nmos/client-testing/', methods=['GET'], strict_slashes=False)
+def jtnm_tests_get():
+    return Response(data.getJson(), mimetype='application/json')
 
 def do_request(method, url, **kwargs):
     """Perform a basic HTTP request with appropriate error handling"""

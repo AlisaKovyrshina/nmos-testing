@@ -78,6 +78,7 @@ from .suites import IS0902Test
 # from .suites import IS1001Test
 from .suites import BCP00301Test
 from .suites import NC01Test
+from .suites import JTNMTest
 
 FLASK_APPS = []
 DNS_SERVER = None
@@ -94,7 +95,8 @@ core_app.config['TEST_ACTIVE'] = False
 core_app.config['PORT'] = CONFIG.PORT_BASE
 core_app.config['SECURE'] = False
 core_app.register_blueprint(NODE_API)  # Dependency for IS0401Test
-core_app.register_blueprint(NC01Test.TEST_API)
+#core_app.register_blueprint(NC01Test.TEST_API)
+core_app.register_blueprint(JTNMTest.TEST_API)
 FLASK_APPS.append(core_app)
 
 for instance in range(NUM_REGISTRIES):
@@ -290,6 +292,14 @@ TEST_DEFINITIONS = {
             "api_key": "testing-facade"
         }],
         "class": NC01Test.NC01Test
+    },
+    "JT-NM-Tested": {
+        "name": "IS-11 Tests",
+        "specs": [{
+            "spec_key": "jt-nm-tested",
+            "api_key": "client-testing"
+        }],
+        "class": JTNMTest.JTNMTest
     },
 }
 
@@ -527,6 +537,9 @@ def run_tests(test, endpoints, test_selection=["all"]):
             # This test has an unusual constructor as it requires a system api instance
             test_obj = test_def["class"](apis, SYSTEMS, DNS_SERVER)
         elif test == "NC-01":
+            # This test has an unusual constructor as it requires a registry instance
+            test_obj = test_def["class"](apis, REGISTRIES, NODE, DNS_SERVER)
+        elif test == "JT-NM-Tested":
             # This test has an unusual constructor as it requires a registry instance
             test_obj = test_def["class"](apis, REGISTRIES, NODE, DNS_SERVER)
         else:

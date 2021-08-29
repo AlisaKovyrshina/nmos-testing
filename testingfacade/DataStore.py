@@ -56,7 +56,7 @@ class DataStore:
     def setJson(self, json_str):
         self.status = "Test"
         self.test_type = json_str["test_type"]
-        self.question_id = json_str["question_id"]
+        # self.question_id = json_str["question_id"]
         self.name = json_str["name"]
         self.description = json_str["description"]
         self.question = json_str["question"]

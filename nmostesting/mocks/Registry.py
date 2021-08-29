@@ -15,9 +15,12 @@
 import time
 import flask
 import json
+import random
 import re
 import threading
 import uuid
+import pathlib
+from pathlib import Path
 
 from flask import request, jsonify, abort, Blueprint, Response
 from threading import Event
@@ -25,6 +28,8 @@ from ..Config import PORT_BASE, AUTH_TOKEN_PUBKEY, ENABLE_AUTH, AUTH_TOKEN_ISSUE
 from authlib.jose import jwt
 from ..NMOSUtils import NMOSUtils
 from ..TestHelper import SubscriptionWebsocketWorker, get_default_ip
+from flask import send_file, send_from_directory, safe_join, abort
+
 
 class RegistryCommon(object):
     def __init__(self):
@@ -189,7 +194,7 @@ class Registry(object):
 
         resource_type = self._get_resource_type(resource_path)
 
-        resource_types = ['node', 'device', 'source', 'flow', 'sender', 'receiver']
+        resource_types = ['node', 'device', 'source', 'flow', 'sender', 'receiver', 'sink' , 'id-list' ]
 
         if resource_type not in resource_types:
             raise SubscriptionException("Unknown resource type:" + resource_type + " from resource path:" + resource_path)
@@ -387,7 +392,7 @@ def query(version):
 
     registry.query_api_called = True
 
-    base_data = ['devices/', 'flows/', 'nodes/', 'receivers/', 'senders/', 'sources/', 'subscriptions/']
+    base_data = ['receivers/', 'senders/', 'sinks/']
 
     return Response(json.dumps(base_data), mimetype='application/json')
 
@@ -480,3 +485,130 @@ def base():
     base_data = ["I'm a mock registry"]
     return Response(json.dumps(base_data), mimetype='application/json')
 
+
+
+
+@REGISTRY_API.route('/x-nmos/query/<version>/receivers/<resource_id>', methods=["GET"], strict_slashes=False)    
+def receivers_sinks(version, resource_id):
+    registry = REGISTRIES[flask.current_app.config["REGISTRY_INSTANCE"]]
+    if not registry.enabled:
+        abort(500)
+    authorized = registry.check_authorized(request.headers, request.path, True)
+    if authorized is not True:
+        abort(authorized)
+
+    resource_type = "receiver"
+    try:
+        # Check to see if resource is being requested as a query
+        if request.args.get('id'):
+    
+            resource_id = request.args.get('id')
+            base_data.append(registry.get_resources()[resource_type][resource_id])
+        else:
+            data = registry.get_resources()[resource_type]
+            for key, value in data.items():
+                base_data.append(value)
+    except Exception:
+        pass
+
+    registry.query_api_called = True
+
+    base_data = ["sinks/"]
+
+    return Response(json.dumps(base_data), mimetype='application/json')
+
+@REGISTRY_API.route('/x-nmos/query/<version>/sinks/<resource_id>', methods=["GET"], strict_slashes=False)    
+def sinks_edid_properties(version, resource_id):
+    registry = REGISTRIES[flask.current_app.config["REGISTRY_INSTANCE"]]
+    if not registry.enabled:
+        abort(500)
+    authorized = registry.check_authorized(request.headers, request.path, True)
+    if authorized is not True:
+        abort(authorized)
+
+    resource_type = "sink"
+    try:
+        # Check to see if resource is being requested as a query
+        if request.args.get('id'):
+    
+            resource_id = request.args.get('id')
+            base_data.append(registry.get_resources()[resource_type][resource_id])
+        else:
+            data = registry.get_resources()[resource_type]
+            for key, value in data.items():
+                base_data.append(value)
+    except Exception:
+        pass
+
+    registry.query_api_called = True
+
+    base_data = [
+            "edid/",
+            "properties/" 
+            ]
+
+    return Response(json.dumps(base_data), mimetype='application/json')
+
+
+@REGISTRY_API.route('/x-nmos/query/<version>/receivers/<resource_id>/sinks', methods=["GET"], strict_slashes=False)    
+def receivers_sinks_sink_ids(version, resource_id):
+    registry = REGISTRIES[flask.current_app.config["REGISTRY_INSTANCE"]]
+    if not registry.enabled:
+        abort(500)
+    authorized = registry.check_authorized(request.headers, request.path, True)
+    if authorized is not True:
+        abort(authorized)
+
+    resource_type = "id-list"
+    base_data = []
+    try:
+        # Check to see if resource is being requested as a query
+        if request.args.get('id'):
+            resource_id = request.args.get('id')
+            base_data.append(registry.get_resources()[resource_type][resource_id])
+        else:
+            data = registry.get_resources()[resource_type]
+            for key, value in data.items():
+                base_data.append(value)
+    except Exception:
+        pass
+
+    registry.query_api_called = True
+
+
+    return Response(json.dumps(base_data), mimetype='application/json')
+
+@REGISTRY_API.route('/x-nmos/query/<version>/sinks/<resource_id>/edid', methods=["GET"], strict_slashes=False)    
+def sink_edid(version, resource_id):
+    registry = REGISTRIES[flask.current_app.config["REGISTRY_INSTANCE"]]
+    if not registry.enabled:
+        abort(500)
+    authorized = registry.check_authorized(request.headers, request.path, True)
+    if authorized is not True:
+        abort(authorized)
+
+    base_data = []
+    index = random.randint(0,5)
+
+    sink_edid_json = []
+    dir_path = pathlib.Path.cwd()
+    sink_edid_path = Path (dir_path , 'test_data', 'JTNM' )
+
+    for i in range(6):
+        sink_edid_json.append("edid_{}.json".format(i))
+    
+    try:
+        # Check to see if resource is being requested as a query
+        if request.args.get('id'):
+            resource_id = request.args.get('id')
+            base_data.append(registry.get_resources()[resource_type][resource_id])
+        else:
+            data = registry.get_resources()[resource_type]
+            for key, value in data.items():
+                base_data.append(value)
+    except Exception:
+        pass
+
+    registry.query_api_called = True
+                                 
+    return send_from_directory(sink_edid_path, sink_edid_json[index], as_attachment=True)

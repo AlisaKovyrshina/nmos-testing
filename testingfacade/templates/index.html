@@ -28,6 +28,7 @@
         var target=(parseInt("{{ time_sent }}") + parseInt("{{ timeout }}")) * 1000;
 
         setInterval(checkForNewQuestion, 5000);
+        setInterval(checkForNewQuestionIS11, 5000);
 
         if (!isNaN(target)) {
             // target time exists so set countdown
@@ -62,6 +63,18 @@
         function checkForNewQuestion() {
             $.ajax({
                 url: "{{ url_for('controller_questions_get') }}",
+                success: function(data) {
+                    var current_test = "{{ name }}";
+                    if (data['name'] != current_test) {
+                        window.location.reload();
+                    }
+                }
+            });
+        }
+
+        function checkForNewQuestionIS11() {
+            $.ajax({
+                url: "{{ url_for('jtnm_tests_get') }}",
                 success: function(data) {
                     var current_test = "{{ name }}";
                     if (data['name'] != current_test) {

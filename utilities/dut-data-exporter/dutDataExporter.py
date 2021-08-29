@@ -46,6 +46,7 @@ if __name__ == "__main__":
     senders = []
     receivers = []
     mac_addresses = []
+    sinks = []
 
     base_url = "http://{}:{}/x-nmos/node/{}/".format(args.ip, args.port, args.version)
 
@@ -94,6 +95,15 @@ if __name__ == "__main__":
         }
         receivers.append(data)
 
+    # Sinks
+    url = base_url + "sinks/"
+    response = requests.get(url)
+    for d in response.json():
+        data = {
+            "id": d["id"]
+        }
+        sinks.append(data)
+
     # Display Data
     print("IS-04 Port: {}".format(is04Port))
     print("IS-05 Port: {}".format(is05Port))
@@ -104,5 +114,7 @@ if __name__ == "__main__":
     pprint.pprint(senders)
     print("Receiver IDs:")
     pprint.pprint(receivers)
+    print("Sink IDs:")
+    pprint.pprint(sinks)   
     print("MAC Addresses:")
     pprint.pprint(mac_addresses)
