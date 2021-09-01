@@ -344,7 +344,7 @@ class JTNMTest(GenericTest):
     def load_resource_data(self):
         """Loads test data from files"""
         result_data = dict()
-        resources = ["sender", "receiver", "sink", "id-list", "properties"]
+        resources = ["sender", "receiver", "sink", "id-list"]
         for resource in resources:
             with open("test_data/JTNM/{}.json".format(resource)) as resource_data:
                 resource_json = json.load(resource_data)
