@@ -341,11 +341,10 @@ class JTNMTest(GenericTest):
         for i in receiver_indices:
             self._register_receiver(self.receivers[i])
 
-
     def load_resource_data(self):
         """Loads test data from files"""
         result_data = dict()
-        resources = ["sender", "receiver", "sink", "id-list"]
+        resources = ["sender", "receiver", "sink", "id-list", "properties"]
         for resource in resources:
             with open("test_data/JTNM/{}.json".format(resource)) as resource_data:
                 resource_json = json.load(resource_data)
@@ -523,7 +522,7 @@ class JTNMTest(GenericTest):
         """
 
         # Question - 2: Manufacturer year
-        question = 'Go to /http://192.168.59.64:5102/x-nmos/query/v1.0/sinks/<sink_id>/edid to open edid file for specified sink \n\n' \
+        question = 'Go to http://192.168.59.64:5102/x-nmos/query/v1.0/sinks/<sink_id>/edid to open edid file for specified sink \n\n' \
         'Although the test AMWA IS-04 Registry should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
         'it is also possible to reach the Registry via the following URL:\n\n' + self.mock_registry_base_url + 'x-nmos/query/v1.0\n\n ' \
 

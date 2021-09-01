@@ -589,13 +589,14 @@ def sink_edid(version, resource_id):
 
     base_data = []
     index = random.randint(0,5)
+    resource_type = "edid"
 
     sink_edid_json = []
     dir_path = pathlib.Path.cwd()
-    sink_edid_path = Path (dir_path , 'test_data', 'JTNM' )
+    sink_edid_path = Path (dir_path , 'test_data', 'JTNM', 'edid' )
 
     for i in range(6):
-        sink_edid_json.append("edid_{}.json".format(i))
+        sink_edid_json.append("edid_{}".format(i))
     
     try:
         # Check to see if resource is being requested as a query
@@ -612,3 +613,33 @@ def sink_edid(version, resource_id):
     registry.query_api_called = True
                                  
     return send_from_directory(sink_edid_path, sink_edid_json[index], as_attachment=True)
+
+
+@REGISTRY_API.route('/x-nmos/query/<version>/sinks/<resource_id>/properties', methods=["GET"], strict_slashes=False)    
+def sink_properties(version, resource_id):
+    registry = REGISTRIES[flask.current_app.config["REGISTRY_INSTANCE"]]
+    if not registry.enabled:
+        abort(500)
+    authorized = registry.check_authorized(request.headers, request.path, True)
+    if authorized is not True:
+        abort(authorized)
+
+    base_data = []
+    resource_type = "properties"
+    
+    try:
+        # Check to see if resource is being requested as a query
+        if request.args.get('id'):
+            resource_id = request.args.get('id')
+            base_data.append(registry.get_resources()[resource_type][resource_id])
+        else:
+            data = registry.get_resources()[resource_type]
+            for key, value in data.items():
+                base_data.append(value)
+    except Exception:
+        pass
+
+    registry.query_api_called = True
+
+
+    return Response(json.dumps(base_data), mimetype='application/json')
