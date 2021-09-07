@@ -542,11 +542,15 @@ def sinks_edid_properties(version, resource_id):
 
     registry.query_api_called = True
 
-    base_data = [
-            "edid/",
-            "properties/" 
-            ]
+    base_data = {
+        'edid' : 'http://localhost:5102/x-nmos/query/v1.0/sinks/' + resource_id + '/edid/',
+        'properties' : 'http://localhost:5102/x-nmos/query/v1.0/sinks/' + resource_id + '/properties/'
+    }
 
+    # base_data = [
+    #     "edid/",
+    #     "properties/"
+    # ]
     return Response(json.dumps(base_data), mimetype='application/json')
 
 

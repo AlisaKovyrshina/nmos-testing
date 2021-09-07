@@ -306,7 +306,7 @@ class JTNMTest(GenericTest):
                           {'label': 'Test-node-3/sink/jonny', 'description': 'Mock sink 6'}]
 
         for sink in self.sinks:
-            sink["id"] = str(uuid.uuid4()) + '/'
+            sink["id"] = str(uuid.uuid4())
             sink["answer_str"] = sink['id']
 
         # Generate indices of self.receivers to be registered and some of those to be non connectable
@@ -340,6 +340,7 @@ class JTNMTest(GenericTest):
         # Register randomly chosen resources, with some excluding connection api and generate answer strings
         for i in receiver_indices:
             self._register_receiver(self.receivers[i])
+        
 
     def load_resource_data(self):
         """Loads test data from files"""
@@ -438,7 +439,7 @@ class JTNMTest(GenericTest):
 
         # Register sink
         sink_data = deepcopy(self.test_data["sink"])
-        sink_data["id"] = sink["id"]
+        sink_data["id"] = sink["id"] + "/"
         self.post_resource(self, "sink", sink_data, codes=codes, fail=fail)
         
     def _delete_sink(self, sink):
@@ -522,7 +523,7 @@ class JTNMTest(GenericTest):
         """
 
         # Question - 2: Manufacturer year
-        question = 'Go to http://192.168.59.64:5102/x-nmos/query/v1.0/sinks/<sink_id>/edid to open edid file for specified sink \n\n' \
+        question = 'Go to ' + self.mock_registry_base_url + 'x-nmos/query/v1.0/sinks/<sink_id>/edid to open edid file for specified sink \n\n' \
         'Although the test AMWA IS-04 Registry should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
         'it is also possible to reach the Registry via the following URL:\n\n' + self.mock_registry_base_url + 'x-nmos/query/v1.0\n\n ' \
 
@@ -530,10 +531,10 @@ class JTNMTest(GenericTest):
 
         try:
             self._invoke_testing_facade(question, [], test_type="action", timeout=600)
+            return test.PASS('You could check edid files using url')
 
         except TestingFacadeException as e:
-            # pre_test_introducton timed out
-            pass
+            return test.UNCLEAR(e.args[0])
 
     def test_03(self, test):
         """
