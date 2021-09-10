@@ -19,12 +19,18 @@ import socket
 import uuid
 import inspect
 import random
+import subprocess
+
+
 from copy import deepcopy
 from urllib.parse import urlparse
 from dnslib import QTYPE
 from git.objects.base import IndexObject
 from threading import Event
 from zeroconf_monkey import ServiceBrowser, ServiceInfo, Zeroconf
+import pathlib
+from pathlib import Path
+
 
 from ..GenericTest import GenericTest, NMOSTestException, NMOSInitException
 from .. import Config as CONFIG
@@ -340,12 +346,34 @@ class JTNMTest(GenericTest):
         # Register randomly chosen resources, with some excluding connection api and generate answer strings
         for i in receiver_indices:
             self._register_receiver(self.receivers[i])
-        
+
+
+        # Properties initial details
+        self.properties = [{'label': 'Display 1', 'description': 'Mock Display 1 ',  'version': 'v1.0', 'tags': []},
+                          {'label': 'Display 2', 'description': 'Mock Display 2 ', 'version': 'v1.0', 'tags': []},
+                          {'label': 'Display 3', 'description': 'Mock Display 3', 'version': 'v1.0', 'tags': []},
+                          {'label': 'Display 4', 'description': 'Mock Display 4', 'version': 'v1.0', 'tags': []},
+                          {'label': 'Display 5', 'description': 'Mock Display 5', 'version': 'v1.0', 'tags': []},
+                          {'label': 'Display 6', 'description': 'Mock Display 6',  'version': 'v1.0', 'tags': []}]
+
+        # Generate indices of self.properties 
+        property_indices = list(range(len(self.properties))) #indices for /properties
+
+        self.properties[0]["id"] = self.sinks[0]["id"]
+        self.properties[1]["id"] = self.sinks[1]["id"]
+        self.properties[2]["id"] = self.sinks[2]["id"]
+        self.properties[3]["id"] = self.sinks[3]["id"]     
+        self.properties[4]["id"] = self.sinks[4]["id"]
+        self.properties[5]["id"] = self.sinks[5]["id"]
+
+        # Register properties for sinks
+        i = random.randint(0,5)
+        self._register_property(self.properties[i])     
 
     def load_resource_data(self):
         """Loads test data from files"""
         result_data = dict()
-        resources = ["sender", "receiver", "sink", "id-list"]
+        resources = ["sender", "receiver", "sink", "id-list", "properties"]
         for resource in resources:
             with open("test_data/JTNM/{}.json".format(resource)) as resource_data:
                 resource_json = json.load(resource_data)
@@ -458,6 +486,17 @@ class JTNMTest(GenericTest):
         receiver_sink_data["id"] = receiver_sink["id"]
         self.post_resource(self, "id-list", receiver_sink_data, codes=codes, fail=fail)
 
+    def _register_property(self, property, codes=[201], fail=Test.FAIL):
+
+        #Register property for sink
+        property_data = deepcopy(self.test_data["properties"])
+        property_data["label"] = property["label"]
+        property_data["description"] = property["description"]
+        property_data["id"] = property["id"]
+        property_data["version"] = property["version"]
+        property_data["tags"] = property["tags"]     
+                           
+        self.post_resource(self, "properties", property_data, codes=codes, fail=fail)
 
     def pre_tests_message(self):
         """
@@ -466,7 +505,7 @@ class JTNMTest(GenericTest):
         question = 'These tests validate a NMOS Controller’s ability to query a Node’s IS-11 \
         endpoints and display correct information about the NMOS Sink Metadata Processing. \
         These tests should help users to receive EDID information and monitor characteristics.\n \
-        it is also possible to reach the Registry via the following URL:\n\n' + self.mock_registry_base_url + 'x-nmos/query/v1.0\n\n \
+        Check the Registry via the following URL:\n\n' + self.mock_registry_base_url + 'x-nmos/query/v1.0\n\n \
         Please click \'Next\' \n'
 
         try:
@@ -522,10 +561,10 @@ class JTNMTest(GenericTest):
         When the user runs this test the Controller must reetrieve the binary EDID file for the specified sink and open it with a program that displays the parsed EDID
         """
 
-        # Question - 2: Manufacturer year
+        # Question - 2: Edid file
         question = 'Go to ' + self.mock_registry_base_url + 'x-nmos/query/v1.0/sinks/<sink_id>/edid to open edid file for specified sink \n\n' \
         'Although the test AMWA IS-04 Registry should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
-        'it is also possible to reach the Registry via the following URL:\n\n' + self.mock_registry_base_url + 'x-nmos/query/v1.0\n\n ' \
+        'Check the Registry via the following URL:\n\n' + self.mock_registry_base_url + 'x-nmos/query/v1.0\n\n ' \
 
         #####LOGIC FUNCTION
 
@@ -541,11 +580,11 @@ class JTNMTest(GenericTest):
         When the user runs this test the Controller must retrieve the EDID properties for the specified sink 
         """
         try:
-            # Question - 3: Manufacturer
-            question = 'What is the Manufacturer.\n\n' \
-            'Select manufacturer and click the \'Next\' button. \n ' \
+            # Question - 3: Properties
+            question = 'Choose specified sink id to check properties.\n\n' \
+            'Select sink id and click the \'Next\' button. \n ' \
             'Although the test AMWA IS-04 Registry should be discoverable via DNS-SD, for the purposes of developing this testing framework ' \
-            'it is also possible to reach the Registry via the following URL:\n\n' + self.mock_registry_base_url + 'x-nmos/query/v1.0\n\n ' \
+            'Check the Registry via the following URL:\n\n' + self.mock_registry_base_url + 'x-nmos/query/v1.0\n\n ' \
 
             #####LOGIC FUNCTION
 

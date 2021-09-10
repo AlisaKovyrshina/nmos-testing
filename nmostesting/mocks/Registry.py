@@ -19,6 +19,8 @@ import random
 import re
 import threading
 import uuid
+import subprocess
+
 import pathlib
 from pathlib import Path
 
@@ -628,9 +630,8 @@ def sink_properties(version, resource_id):
     if authorized is not True:
         abort(authorized)
 
-    base_data = []
     resource_type = "properties"
-    
+    base_data = []
     try:
         # Check to see if resource is being requested as a query
         if request.args.get('id'):
@@ -644,6 +645,5 @@ def sink_properties(version, resource_id):
         pass
 
     registry.query_api_called = True
-
 
     return Response(json.dumps(base_data), mimetype='application/json')
